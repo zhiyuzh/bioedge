@@ -50,38 +50,67 @@ T2 = s16(bus.read_word_data(address, 0x8A))
 T3 = s16(bus.read_word_data(address, 0x8C))
 
 
+def init_bmp280():
+    """
+    Configure and start Bosch BMP280 in continuous normal mode:
+    - 0xF5 (config): Standby time 0.5ms, IIR filter coefficient 16 (0x10)
+    - 0xF4 (ctrl_meas): Temp oversampling x2 (010), Press oversampling x16 (101), Normal mode (11) -> 0x57
+    """
+    try:
+        bus.write_byte_data(address, 0xF5, 0x10)
+        bus.write_byte_data(address, 0xF4, 0x57)
+        time.sleep(0.05)
+    except Exception as e:
+        print(f"Error initializing BMP280: {e}")
+
+
+init_bmp280()
+
+
 def read_sensor():
+    try:
+        data = bus.read_i2c_block_data(address, 0xF7, 6)
 
-    data = bus.read_i2c_block_data(address, 0xF7, 6)
+        raw_p = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4)
+        raw_t = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4)
 
-    raw_p = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4)
-    raw_t = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4)
+        # 0x80000 indicates uninitialized / sleep mode / skipped measurement
+        if raw_p == 0x80000 or raw_t == 0x80000:
+            init_bmp280()
+            return None, None
 
-    # Temperature
-    v1 = (((raw_t >> 3) - (T1 << 1)) * T2) >> 11
-    v2 = (((((raw_t >> 4) - T1) ** 2) >> 12) * T3) >> 14
-    t_fine = v1 + v2
+        # Temperature
+        v1 = (((raw_t >> 3) - (T1 << 1)) * T2) >> 11
+        v2 = (((((raw_t >> 4) - T1) ** 2) >> 12) * T3) >> 14
+        t_fine = v1 + v2
 
-    temperature = (t_fine * 5 + 128) / 25600
+        temperature = (t_fine * 5 + 128) / 25600
 
-    # Pressure
-    v1 = t_fine - 128000
-    v2 = v1 * v1 * P6 + ((v1 * P5) << 17) + (P4 << 35)
+        # Pressure
+        v1 = t_fine - 128000
+        v2 = v1 * v1 * P6 + ((v1 * P5) << 17) + (P4 << 35)
 
-    v1 = ((v1 * v1 * P3) >> 8) + ((v1 * P2) << 12)
-    v1 = (((1 << 47) + v1) * P1) >> 33
+        v1 = ((v1 * v1 * P3) >> 8) + ((v1 * P2) << 12)
+        if v1 == 0:
+            return temperature, None
+        v1 = (((1 << 47) + v1) * P1) >> 33
+        if v1 == 0:
+            return temperature, None
 
-    p = 1048576 - raw_p
-    p = ((p << 31) - v2) * 3125 // v1
+        p = 1048576 - raw_p
+        p = ((p << 31) - v2) * 3125 // v1
 
-    v1 = (P9 * (p >> 13) ** 2) >> 25
-    v2 = (P8 * p) >> 19
+        v1 = (P9 * (p >> 13) ** 2) >> 25
+        v2 = (P8 * p) >> 19
 
-    p = ((p + v1 + v2) >> 8) + (P7 << 4)
+        p = ((p + v1 + v2) >> 8) + (P7 << 4)
 
-    pressure = p / 25600
+        pressure = p / 25600
 
-    return temperature, pressure
+        return temperature, pressure
+    except Exception as e:
+        print(f"Error reading BMP280: {e}")
+        return None, None
 
 
 # -------------------------------------------------
@@ -132,9 +161,9 @@ def data():
 
     return jsonify({
         "pi_temperature": pi_temperature,
-        "temperature": round(temperature, 2),
-        "pressure": round(pressure, 2),
-        "pressure_mmhg": round(pressure * 0.750062, 2),
+        "temperature": round(temperature, 2) if temperature is not None else None,
+        "pressure": round(pressure, 2) if pressure is not None else None,
+        "pressure_mmhg": round(pressure * 0.750062, 2) if pressure is not None else None,
         "light_1_lux": round(lux1, 2) if lux1 is not None else None,
         "light_2_lux": round(lux2, 2) if lux2 is not None else None
     })
