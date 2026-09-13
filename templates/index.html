@@ -1,0 +1,2830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioEdge • Environmental Telemetry</title>
+    <style>
+        :root {
+            --bg-base: #0a0e17;
+            --bg-surface: #111827;
+            --bg-card: #162032;
+            --bg-card-hover: #1c2940;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(16, 185, 129, 0.3);
+            --text-primary: #f9fafb;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-emerald: #10b981;
+            --accent-cyan: #06b6d4;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-indigo: #818cf8;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="light"] {
+            --bg-base: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f1f5f9;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --border-highlight: rgba(16, 185, 129, 0.4);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+        }
+
+        [data-theme="light"] header {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95));
+        }
+
+        [data-theme="light"] .brand-text h1 {
+            background: linear-gradient(90deg, #0f172a, #334155);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        [data-theme="light"] .ctrl-btn {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        [data-theme="light"] .ctrl-btn:hover {
+            background: rgba(0, 0, 0, 0.08);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        [data-theme="light"] .card-icon,
+        [data-theme="light"] .card-badge,
+        [data-theme="light"] .i2c-badge {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        [data-theme="light"] .metric-value,
+        [data-theme="light"] .sensor-subcard .sub-val {
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .metric-secondary,
+        [data-theme="light"] footer {
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] .sensor-subcard {
+            background: rgba(0, 0, 0, 0.025);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        [data-theme="light"] .status-meter {
+            background: rgba(0, 0, 0, 0.06);
+        }
+
+        [data-theme="light"] .chart-tabs {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        [data-theme="light"] .chart-tab.active {
+            background: #ffffff;
+            color: var(--text-primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        }
+
+        /* ============================================================
+           Rainbow Cyber Theme
+           ============================================================ */
+        @keyframes rainbowFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        [data-theme="rainbow"] {
+            --bg-base: #0a0618;
+            --bg-surface: #120926;
+            --bg-card: rgba(23, 13, 48, 0.88);
+            --bg-card-hover: rgba(36, 20, 74, 0.95);
+            --border-color: rgba(168, 85, 247, 0.28);
+            --border-highlight: rgba(236, 72, 153, 0.55);
+            --text-primary: #fdf4ff;
+            --text-secondary: #d8b4fe;
+            --text-muted: #a855f7;
+            --accent-emerald: #00f5d4;
+            --accent-cyan: #00bbf9;
+            --accent-amber: #fee440;
+            --accent-rose: #ff007f;
+            --accent-indigo: #9b5de5;
+            --shadow-card: 0 4px 25px -2px rgba(126, 34, 206, 0.35), 0 0 0 1px rgba(236, 72, 153, 0.18);
+        }
+
+        [data-theme="rainbow"] header {
+            background: linear-gradient(135deg, rgba(18, 9, 40, 0.95), rgba(30, 14, 62, 0.95));
+            border-color: rgba(217, 70, 239, 0.35);
+            box-shadow: 0 4px 30px rgba(192, 38, 211, 0.22), 0 0 20px rgba(59, 130, 246, 0.15);
+            position: relative;
+        }
+
+        [data-theme="rainbow"] header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ff007f, #ff7a00, #ffee00, #00f076, #00c3ff, #aa00ff, #ff007f);
+            background-size: 200% 100%;
+            animation: rainbowFlow 4s linear infinite;
+            border-top-left-radius: var(--radius-lg);
+            border-top-right-radius: var(--radius-lg);
+        }
+
+        [data-theme="rainbow"] .brand-icon {
+            background: linear-gradient(135deg, #ec4899, #8b5cf6, #00c3ff);
+            background-size: 200% 200%;
+            animation: rainbowFlow 4s ease infinite;
+            box-shadow: 0 0 25px rgba(236, 72, 153, 0.5);
+        }
+
+        [data-theme="rainbow"] .brand-text h1 {
+            background: linear-gradient(90deg, #ff2a85, #ff7300, #ffdd00, #00e676, #00b0ff, #d500f9, #ff2a85);
+            background-size: 300% 100%;
+            animation: rainbowFlow 6s linear infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        [data-theme="rainbow"] .card {
+            border-color: rgba(168, 85, 247, 0.3);
+            box-shadow: 0 6px 24px -2px rgba(139, 92, 246, 0.25), 0 0 0 1px rgba(236, 72, 153, 0.15);
+        }
+
+        [data-theme="rainbow"] .card:hover {
+            border-color: rgba(236, 72, 153, 0.6);
+            box-shadow: 0 10px 35px -2px rgba(236, 72, 153, 0.35), 0 0 20px rgba(139, 92, 246, 0.3);
+        }
+
+        [data-theme="rainbow"] .card::before {
+            background: linear-gradient(90deg, #ff007f, #ff7a00, #ffee00, #00f076, #00c3ff, #aa00ff, #ff007f);
+            background-size: 200% 100%;
+            animation: rainbowFlow 6s linear infinite;
+        }
+
+        [data-theme="rainbow"] .sensor-subcard {
+            background: rgba(30, 16, 64, 0.65);
+            border: 1px solid rgba(168, 85, 247, 0.25);
+        }
+
+        [data-theme="rainbow"] .status-meter {
+            background: rgba(168, 85, 247, 0.16);
+        }
+
+        [data-theme="rainbow"] .ctrl-btn {
+            background: rgba(168, 85, 247, 0.12);
+            border-color: rgba(168, 85, 247, 0.3);
+            color: #fdf4ff;
+        }
+
+        [data-theme="rainbow"] .ctrl-btn:hover {
+            background: rgba(236, 72, 153, 0.2);
+            border-color: rgba(236, 72, 153, 0.6);
+            box-shadow: 0 0 14px rgba(236, 72, 153, 0.35);
+        }
+
+        [data-theme="rainbow"] .chart-section {
+            border-color: rgba(168, 85, 247, 0.3);
+            box-shadow: 0 6px 30px -4px rgba(139, 92, 246, 0.3), 0 0 0 1px rgba(236, 72, 153, 0.15);
+        }
+
+        [data-theme="rainbow"] .chart-tabs {
+            background: rgba(18, 9, 42, 0.75);
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        [data-theme="rainbow"] .chart-tab.active {
+            background: linear-gradient(135deg, #ec4899, #8b5cf6);
+            color: #ffffff;
+            box-shadow: 0 2px 12px rgba(236, 72, 153, 0.5);
+        }
+
+        [data-theme="rainbow"] .timeline-track {
+            background: rgba(30, 16, 65, 0.85);
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        [data-theme="rainbow"] .timeline-handle {
+            background: linear-gradient(90deg, #ff007f, #ff7a00, #ffee00, #00f076, #00c3ff, #aa00ff);
+            background-size: 200% 100%;
+            animation: rainbowFlow 4s linear infinite;
+            box-shadow: 0 0 10px rgba(236, 72, 153, 0.6);
+        }
+
+        [data-theme="rainbow"] .drag-hint-overlay {
+            background: rgba(20, 10, 45, 0.88);
+            border-color: rgba(217, 70, 239, 0.4);
+            color: #d8b4fe;
+        }
+
+        [data-theme="rainbow"] .history-pill {
+            background: rgba(254, 228, 64, 0.2);
+            color: #fee440;
+            border-color: rgba(254, 228, 64, 0.4);
+        }
+
+        [data-theme="rainbow"] .live-jump-btn {
+            background: rgba(0, 245, 212, 0.18);
+            border-color: rgba(0, 245, 212, 0.45);
+            color: #00f5d4;
+        }
+
+        [data-theme="rainbow"] .metric-value {
+            color: #ffffff;
+            text-shadow: 0 0 16px rgba(216, 180, 254, 0.45);
+        }
+
+        [data-theme="rainbow"] footer {
+            border-color: rgba(168, 85, 247, 0.22);
+        }
+
+        [data-theme="rainbow"] .i2c-badge {
+            background: rgba(168, 85, 247, 0.12);
+            border-color: rgba(168, 85, 247, 0.3);
+            color: #d8b4fe;
+        }
+
+        [data-theme="rainbow"] .card.card-pi.is-overheating {
+            background: linear-gradient(135deg, rgba(255, 0, 127, 0.28), var(--bg-card)) !important;
+            border-color: #ff007f !important;
+            box-shadow: 0 0 30px rgba(255, 0, 127, 0.5), 0 0 0 1.5px rgba(255, 0, 127, 0.8) !important;
+        }
+
+        [data-theme="rainbow"] .card.card-pi.is-pending {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 25px rgba(245, 158, 11, 0.45) !important;
+        }
+
+        [data-theme="rainbow"] .card.card-light.is-abnormal {
+            background: linear-gradient(135deg, rgba(254, 228, 64, 0.22), var(--bg-card)) !important;
+            border-color: #fee440 !important;
+            box-shadow: 0 0 30px rgba(254, 228, 64, 0.45), 0 0 0 1.5px rgba(255, 0, 127, 0.8) !important;
+        }
+
+        [data-theme="rainbow"] .alert-banner {
+            background: rgba(30, 8, 42, 0.96);
+            border-color: rgba(255, 0, 127, 0.7);
+            box-shadow: 0 12px 40px -4px rgba(0, 0, 0, 0.8), 0 0 25px rgba(255, 0, 127, 0.4);
+        }
+
+
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            min-height: 100vh;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1280px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Header Bar */
+        header {
+            background: linear-gradient(135deg, rgba(22, 32, 50, 0.8), rgba(17, 24, 39, 0.9));
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 18px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, #059669, #0284c7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(5, 150, 105, 0.35);
+        }
+
+        .brand-icon svg {
+            width: 26px;
+            height: 26px;
+            stroke: #ffffff;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .brand-text h1 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(90deg, #ffffff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--accent-emerald);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            transition: var(--transition);
+        }
+
+        .status-pill.error {
+            background: rgba(244, 63, 94, 0.12);
+            color: var(--accent-rose);
+            border-color: rgba(244, 63, 94, 0.3);
+        }
+
+        .status-pill.paused {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--accent-amber);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        .ctrl-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ctrl-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .ctrl-select {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .theme-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid var(--border-color);
+            border-radius: 9999px;
+            padding: 3px;
+            cursor: pointer;
+            gap: 2px;
+            transition: var(--transition);
+        }
+
+        .theme-toggle-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: var(--transition);
+            user-select: none;
+        }
+
+        .theme-toggle-option svg {
+            stroke-width: 2;
+        }
+
+        .theme-toggle-option.active {
+            background: linear-gradient(135deg, #059669, #0284c7);
+            color: #ffffff;
+            box-shadow: 0 2px 10px rgba(5, 150, 105, 0.45);
+        }
+
+        [data-theme="light"] .theme-toggle-btn {
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(0, 0, 0, 0.12);
+        }
+
+        [data-theme="light"] .theme-toggle-option.active {
+            background: linear-gradient(135deg, #0284c7, #059669);
+            color: #ffffff;
+            box-shadow: 0 2px 10px rgba(2, 132, 199, 0.35);
+        }
+
+        [data-theme="rainbow"] .theme-toggle-btn {
+            background: rgba(18, 9, 42, 0.85);
+            border-color: rgba(217, 70, 239, 0.45);
+            box-shadow: 0 0 14px rgba(168, 85, 247, 0.3);
+        }
+
+        .theme-toggle-option#theme_opt_rainbow.active,
+        [data-theme="rainbow"] .theme-toggle-option#theme_opt_rainbow.active {
+            background: linear-gradient(135deg, #ff007f, #8b5cf6, #00c3ff);
+            background-size: 200% 200%;
+            animation: rainbowFlow 3s ease infinite;
+            color: #ffffff;
+            box-shadow: 0 2px 14px rgba(217, 70, 239, 0.65);
+        }
+
+
+        /* Metrics Cards Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: var(--shadow-card);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.6);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--accent-gradient, linear-gradient(90deg, transparent, transparent));
+            opacity: 0.9;
+        }
+
+        .card.card-temp { --accent-gradient: linear-gradient(90deg, #f43f5e, #fb923c); }
+        .card.card-pi { --accent-gradient: linear-gradient(90deg, #06b6d4, #3b82f6); }
+        .card.card-pressure { --accent-gradient: linear-gradient(90deg, #818cf8, #c084fc); }
+        .card.card-light { --accent-gradient: linear-gradient(90deg, #f59e0b, #10b981); }
+
+        /* Overheating Warning State for SoC Core Temp */
+        .card.card-pi.is-overheating {
+            background: linear-gradient(135deg, rgba(244, 63, 94, 0.22), var(--bg-card)) !important;
+            border-color: var(--accent-rose) !important;
+            box-shadow: 0 0 25px rgba(244, 63, 94, 0.45), 0 0 0 1.5px rgba(244, 63, 94, 0.7) !important;
+            animation: overheat-pulse 1.8s infinite ease-in-out;
+        }
+
+        .card.card-pi.is-overheating::before {
+            background: linear-gradient(90deg, #f43f5e, #dc2626) !important;
+        }
+
+        .card.card-pi.is-overheating .card-icon {
+            color: var(--accent-rose) !important;
+            background: rgba(244, 63, 94, 0.2) !important;
+        }
+
+        [data-theme="light"] .card.card-pi.is-overheating {
+            background: linear-gradient(135deg, rgba(254, 226, 226, 0.95), #ffffff) !important;
+            border-color: #ef4444 !important;
+            box-shadow: 0 4px 25px rgba(239, 68, 68, 0.35), 0 0 0 1.5px rgba(239, 68, 68, 0.6) !important;
+        }
+
+        @keyframes overheat-pulse {
+            0%, 100% {
+                border-color: rgba(244, 63, 94, 0.65);
+                box-shadow: 0 0 16px rgba(244, 63, 94, 0.3);
+            }
+            50% {
+                border-color: rgba(244, 63, 94, 1);
+                box-shadow: 0 0 32px rgba(244, 63, 94, 0.65), 0 0 0 2px rgba(244, 63, 94, 0.85);
+            }
+        }
+
+        /* Pending Warning State for SoC Core Temp (45°C - 50°C) */
+        .card.card-pi.is-pending {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), var(--bg-card)) !important;
+            border-color: var(--accent-amber) !important;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.35), 0 0 0 1px rgba(245, 158, 11, 0.5) !important;
+        }
+
+        .card.card-pi.is-pending::before {
+            background: linear-gradient(90deg, #f59e0b, #d97706) !important;
+        }
+
+        .card.card-pi.is-pending .card-icon {
+            color: var(--accent-amber) !important;
+            background: rgba(245, 158, 11, 0.2) !important;
+        }
+
+        [data-theme="light"] .card.card-pi.is-pending {
+            background: linear-gradient(135deg, rgba(254, 243, 199, 0.95), #ffffff) !important;
+            border-color: #f59e0b !important;
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3) !important;
+        }
+
+        /* Abnormal Lux Delta Alert for Illuminance Card */
+        .card.card-light.is-abnormal {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), var(--bg-card)) !important;
+            border-color: var(--accent-amber) !important;
+            box-shadow: 0 0 28px rgba(245, 158, 11, 0.5), 0 0 0 1.5px rgba(245, 158, 11, 0.75) !important;
+            animation: abnormal-pulse 1.8s infinite ease-in-out;
+        }
+
+        .card.card-light.is-abnormal::before {
+            background: linear-gradient(90deg, #f59e0b, #ef4444) !important;
+        }
+
+        .card.card-light.is-abnormal .card-icon {
+            color: var(--accent-amber) !important;
+            background: rgba(245, 158, 11, 0.25) !important;
+        }
+
+        [data-theme="light"] .card.card-light.is-abnormal {
+            background: linear-gradient(135deg, rgba(254, 243, 199, 0.95), #ffffff) !important;
+            border-color: #f59e0b !important;
+            box-shadow: 0 4px 25px rgba(245, 158, 11, 0.35), 0 0 0 1.5px rgba(245, 158, 11, 0.6) !important;
+        }
+
+        @keyframes abnormal-pulse {
+            0%, 100% {
+                border-color: rgba(245, 158, 11, 0.65);
+                box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+            }
+            50% {
+                border-color: rgba(245, 158, 11, 1);
+                box-shadow: 0 0 32px rgba(245, 158, 11, 0.65), 0 0 0 2px rgba(245, 158, 11, 0.85);
+            }
+        }
+
+        /* Floating Abnormal Lux Alert Banner */
+        .alert-banner {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            width: min(92vw, 560px);
+            background: rgba(26, 12, 14, 0.94);
+            border: 1px solid rgba(244, 63, 94, 0.65);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-radius: var(--radius-md);
+            padding: 14px 18px;
+            box-shadow: 0 12px 40px -4px rgba(0, 0, 0, 0.7), 0 0 25px rgba(244, 63, 94, 0.35);
+            animation: alertSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .alert-banner-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 100%;
+            background: linear-gradient(90deg, #f43f5e, #fb7185);
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+            transform-origin: left;
+        }
+
+        .alert-banner-progress.animate {
+            animation: alertCountdown 20s linear forwards;
+        }
+
+        @keyframes alertCountdown {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+
+        @keyframes alertSlideDown {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -24px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+        }
+
+        .alert-banner-content {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .alert-banner-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: rgba(244, 63, 94, 0.2);
+            color: var(--accent-rose);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        .alert-banner-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .alert-banner-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .alert-banner-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: #fecdd3;
+            margin-bottom: 2px;
+        }
+
+        .alert-banner-msg {
+            font-size: 0.78rem;
+            color: #fda4af;
+            line-height: 1.35;
+        }
+
+        .alert-banner-btn {
+            background: rgba(244, 63, 94, 0.2);
+            border: 1px solid rgba(244, 63, 94, 0.45);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .alert-banner-btn:hover {
+            background: rgba(244, 63, 94, 0.38);
+            border-color: var(--accent-rose);
+        }
+
+        [data-theme="light"] .alert-banner {
+            background: rgba(255, 241, 242, 0.97);
+            border-color: rgba(239, 68, 68, 0.45);
+            box-shadow: 0 10px 30px -4px rgba(239, 68, 68, 0.2), 0 0 20px rgba(239, 68, 68, 0.15);
+        }
+
+        [data-theme="light"] .alert-banner-title {
+            color: #9f1239;
+        }
+
+        [data-theme="light"] .alert-banner-msg {
+            color: #be123c;
+        }
+
+        [data-theme="light"] .alert-banner-btn {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.35);
+            color: #9f1239;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .card-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2;
+            stroke: currentColor;
+            fill: none;
+        }
+
+        .card-badge {
+            font-size: 0.72rem;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .metric-value-container {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .metric-value {
+            font-size: 2.35rem;
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            font-variant-numeric: tabular-nums;
+            color: #ffffff;
+        }
+
+        .metric-unit {
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .metric-secondary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+
+        .metric-secondary-val {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Dual Light Sensor Split */
+        .dual-metric-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 4px;
+        }
+
+        .sensor-subcard {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .sensor-subcard .sub-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .sensor-subcard .sub-val {
+            font-size: 1.45rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: #ffffff;
+        }
+
+        .sensor-subcard .sub-tag {
+            font-size: 0.7rem;
+            color: var(--accent-amber);
+        }
+
+        /* Progress / Activity Bar */
+        .status-meter {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 9999px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .status-meter-bar {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.5s ease-out;
+        }
+
+        /* Real-Time Graph Section */
+        .chart-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: var(--shadow-card);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .chart-title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px;
+            border-radius: var(--radius-sm);
+            gap: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .chart-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .chart-tab.active {
+            background: var(--bg-card-hover);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: 250px;
+            position: relative;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .canvas-container.is-dragging {
+            cursor: grabbing;
+        }
+
+        .drag-hint-overlay {
+            position: absolute;
+            top: 10px;
+            right: 14px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            border: 1px solid var(--border-color);
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        [data-theme="light"] .drag-hint-overlay {
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--text-secondary);
+        }
+
+        .history-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-amber);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            margin-left: 8px;
+        }
+
+        .live-jump-btn {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: var(--accent-emerald);
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-jump-btn:hover {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: var(--accent-emerald);
+        }
+
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: var(--accent-emerald);
+            animation: pulse-glow 1.5s infinite ease-in-out;
+        }
+
+        /* Timeline Scrubber Track */
+        .timeline-bar-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 2px 4px;
+        }
+
+        .timeline-time {
+            font-size: 0.72rem;
+            font-family: monospace;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .timeline-track {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 9999px;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        [data-theme="light"] .timeline-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .timeline-handle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, #059669, #0284c7);
+            border-radius: 9999px;
+            transition: left 0.05s linear, width 0.05s linear;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        /* Footer & Diagnostics */
+        footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 12px 6px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .i2c-badges {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .i2c-badge {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.72rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 14px 10px;
+            }
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .controls-group {
+                justify-content: space-between;
+            }
+            .canvas-container {
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Floating Abnormal Lux Alert Banner -->
+<div id="lux_alert_banner" class="alert-banner" style="display: none;">
+    <div class="alert-banner-content">
+        <div class="alert-banner-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+        </div>
+        <div class="alert-banner-text">
+            <div class="alert-banner-title">⚠️ ABNORMAL LUX DELTA DETECTED</div>
+            <div id="lux_alert_msg" class="alert-banner-msg">Sudden change in differential lux exceeded threshold.</div>
+        </div>
+        <div class="alert-banner-actions">
+            <button id="alert_dismiss_btn" class="alert-banner-btn" type="button" title="Dismiss Alert">Dismiss</button>
+        </div>
+    </div>
+    <div id="alert_progress_bar" class="alert-banner-progress"></div>
+</div>
+
+<div class="container">
+
+    <!-- Top Navigation / Header -->
+    <header>
+        <div class="brand-group">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+            </div>
+            <div class="brand-text">
+                <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                    <h1>BioEdge System</h1>
+                    <div class="theme-switch-wrapper" title="Switch Theme (Dark / Light / Rainbow)">
+                        <button id="theme_toggle_btn" class="theme-toggle-btn" type="button" aria-label="Toggle theme">
+                            <span class="theme-toggle-option active" id="theme_opt_dark">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                                <span>Dark</span>
+                            </span>
+                            <span class="theme-toggle-option" id="theme_opt_light">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                                <span>Light</span>
+                            </span>
+                            <span class="theme-toggle-option" id="theme_opt_rainbow">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M22 17a10 10 0 0 0-20 0"></path>
+                                    <path d="M18 17a6 6 0 0 0-12 0"></path>
+                                    <path d="M14 17a2 2 0 0 0-4 0"></path>
+                                </svg>
+                                <span>Rainbow</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                <p>Raspberry Pi Edge Telemetry & Sensors</p>
+            </div>
+        </div>
+
+        <div class="controls-group">
+            <div id="connection_pill" class="status-pill">
+                <span class="pulse-dot"></span>
+                <span id="connection_text">LIVE STREAMING</span>
+            </div>
+
+            <!-- Audio Chime Toggle -->
+            <button id="alert_sound_btn" class="ctrl-btn" type="button" title="Toggle Alert Sound Chime">
+                <svg id="sound_icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path id="sound_waves" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                <span id="sound_text">Audio ON</span>
+            </button>
+
+            <!-- OS Desktop Notification Permission -->
+            <button id="notify_perm_btn" class="ctrl-btn" type="button" title="Enable Desktop OS Notifications">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span id="notify_perm_text">Desktop Alerts</span>
+            </button>
+
+            <select id="refresh_rate_select" class="ctrl-select" title="Refresh Interval">
+                <option value="1000">1.0s Interval</option>
+                <option value="2000">2.0s Interval</option>
+                <option value="5000">5.0s Interval</option>
+            </select>
+
+            <button id="pause_btn" class="ctrl-btn" type="button">
+                <svg id="pause_icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+                <span id="pause_text">Pause</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Metrics Cards Grid -->
+    <div class="metrics-grid">
+
+        <!-- Card: Ambient Temperature (BMP280) -->
+        <div class="card card-temp">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon" style="color: var(--accent-rose);">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+                        </svg>
+                    </div>
+                    <span>Ambient Temp</span>
+                </div>
+                <span class="card-badge">BMP280 (0x76)</span>
+            </div>
+
+            <div class="metric-value-container">
+                <span id="temperature" class="metric-value">--</span>
+                <span class="metric-unit">°C</span>
+            </div>
+
+            <div class="status-meter">
+                <div id="temp_meter" class="status-meter-bar" style="width: 50%; background: linear-gradient(90deg, #f43f5e, #fb923c);"></div>
+            </div>
+
+            <div class="metric-secondary">
+                <span>Fahrenheit Equivalent</span>
+                <span id="temp_fahrenheit" class="metric-secondary-val">-- °F</span>
+            </div>
+        </div>
+
+        <!-- Card: Atmospheric Pressure (BMP280) -->
+        <div class="card card-pressure">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon" style="color: var(--accent-indigo);">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 6v6l4 2"></path>
+                        </svg>
+                    </div>
+                    <span>Barometric Pressure</span>
+                </div>
+                <span class="card-badge">BMP280</span>
+            </div>
+
+            <div class="metric-value-container">
+                <span id="pressure" class="metric-value">--</span>
+                <span class="metric-unit">mmHg</span>
+            </div>
+
+            <div class="status-meter">
+                <div id="pressure_meter" class="status-meter-bar" style="width: 60%; background: linear-gradient(90deg, #818cf8, #c084fc);"></div>
+            </div>
+
+            <div class="metric-secondary">
+                <span>Hectopascal (hPa)</span>
+                <span class="metric-secondary-val"><span id="pressure_hpa">--</span> hPa</span>
+            </div>
+        </div>
+
+        <!-- Card: Ambient Light Sensors (GY-302 / BH1750) -->
+        <div class="card card-light" id="card_light">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon" style="color: var(--accent-amber);">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                    </div>
+                    <span>Illuminance</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="light_alert_pill" class="status-pill error" style="display: none; padding: 2px 8px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; animation: pulse-glow 1.2s infinite;">ABNORMAL DELTA</span>
+                    <span class="card-badge">GY-302 x2</span>
+                </div>
+            </div>
+
+            <div class="dual-metric-split">
+                <div class="sensor-subcard">
+                    <span class="sub-label">Sensor 1 (0x23)</span>
+                    <span class="sub-val"><span id="light_1_lux">--</span> <small style="font-size: 0.75rem; color: var(--text-muted);">Lux</small></span>
+                    <span id="light_1_desc" class="sub-tag">Waiting...</span>
+                </div>
+                <div class="sensor-subcard">
+                    <span class="sub-label">Sensor 2 (0x5C)</span>
+                    <span class="sub-val"><span id="light_2_lux">--</span> <small style="font-size: 0.75rem; color: var(--text-muted);">Lux</small></span>
+                    <span id="light_2_desc" class="sub-tag">Waiting...</span>
+                </div>
+            </div>
+
+            <div class="metric-secondary" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <span>Differential Delta:</span>
+                    <span id="light_diff" class="metric-secondary-val">--</span>
+                    <span id="light_rate_change" style="font-size: 0.74rem; color: var(--text-muted); margin-left: 6px; font-family: monospace;"></span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label for="lux_threshold_input" style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Δ Threshold:</label>
+                    <div style="display: inline-flex; align-items: center; gap: 3px;">
+                        <input id="lux_threshold_input" type="number" min="1" max="5000" step="5" value="50" title="Alert when sudden shift in differential lux exceeds this value" style="width: 56px; padding: 2px 6px; border-radius: 6px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.76rem; font-family: monospace; text-align: right; outline: none;">
+                        <span style="font-size: 0.72rem; color: var(--text-muted);">Lux</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card: Raspberry Pi Core System -->
+        <div class="card card-pi" id="card_pi">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-icon" style="color: var(--accent-cyan);">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                            <rect x="9" y="9" width="6" height="6"></rect>
+                            <line x1="9" y1="1" x2="9" y2="4"></line>
+                            <line x1="15" y1="1" x2="15" y2="4"></line>
+                            <line x1="9" y1="20" x2="9" y2="23"></line>
+                            <line x1="15" y1="20" x2="15" y2="23"></line>
+                            <line x1="20" y1="9" x2="23" y2="9"></line>
+                            <line x1="20" y1="14" x2="23" y2="14"></line>
+                            <line x1="1" y1="9" x2="4" y2="9"></line>
+                            <line x1="1" y1="14" x2="4" y2="14"></line>
+                        </svg>
+                    </div>
+                    <span>SoC Core Temp</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="pi_alert_pill" class="status-pill paused" style="display: none; padding: 2px 8px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em;">PENDING WARNING</span>
+                    <span class="card-badge">vcgencmd</span>
+                </div>
+            </div>
+
+            <div class="metric-value-container">
+                <span id="pi_temperature" class="metric-value">--</span>
+                <span class="metric-unit" id="pi_temp_unit">°C</span>
+            </div>
+
+            <div class="status-meter">
+                <div id="pi_temp_meter" class="status-meter-bar" style="width: 40%; background: linear-gradient(90deg, #06b6d4, #3b82f6);"></div>
+            </div>
+
+            <div class="metric-secondary">
+                <span>Thermal Status</span>
+                <span id="pi_status_label" class="metric-secondary-val" style="color: var(--accent-emerald);">Optimal</span>
+            </div>
+
+            <div style="border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
+                    <label for="alert_email_input" style="font-size: 0.70rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Email (>50°C for 10s):</label>
+                    <span id="email_10s_counter" style="font-size: 0.70rem; color: var(--accent-emerald); font-family: monospace;">0s / 10s (Optimal)</span>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <input id="alert_email_input" type="email" placeholder="recipient@example.com" title="Email address to notify when CPU temperature > 50°C persists for 10 seconds" style="flex: 1; min-width: 0; padding: 4px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.76rem; font-family: monospace; outline: none;">
+                    <button id="send_test_email_btn" type="button" class="ctrl-btn" style="padding: 4px 10px; font-size: 0.72rem; white-space: nowrap;">Test</button>
+                </div>
+                <div id="email_last_sent_status" style="font-size: 0.68rem; color: var(--text-muted); min-height: 14px;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Real-Time Visualizer Graph -->
+    <div class="chart-section">
+        <div class="chart-header">
+            <div class="chart-title-group">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-emerald)" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <strong style="font-size: 0.95rem;">Real-time Telemetry Stream</strong>
+                    <span id="timeline_mode_badge" class="history-pill" style="display: none;">◀ PAST DATA</span>
+                    <span id="chart_avg_badge" class="history-pill" style="display: inline-flex; background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.35); color: var(--accent-cyan);">Window Avg: --</span>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button id="live_jump_btn" class="ctrl-btn live-jump-btn" type="button" style="display: none;" title="Jump back to live stream">
+                    <span class="live-dot"></span>
+                    <span>Jump to Live</span>
+                </button>
+
+                <div class="chart-tabs">
+                    <button class="chart-tab active" data-chart="temp">Temperature</button>
+                    <button class="chart-tab" data-chart="pressure">Pressure (mmHg)</button>
+                    <button class="chart-tab" data-chart="light">Light (Lux)</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvas_container">
+            <canvas id="telemetryCanvas"></canvas>
+            <div id="drag_hint" class="drag-hint-overlay">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8L22 12L18 16"></path>
+                    <path d="M6 8L2 12L6 16"></path>
+                    <path d="M2 12H22"></path>
+                </svg>
+                <span>Drag horizontally to scrub history</span>
+            </div>
+        </div>
+
+        <!-- Timeline Range Scrubber -->
+        <div class="timeline-bar-wrapper">
+            <span id="timeline_start_time" class="timeline-time">--:--:--</span>
+            <div class="timeline-track" id="timeline_track" title="Click or drag to scrub timeline">
+                <div id="timeline_viewport_handle" class="timeline-handle"></div>
+            </div>
+            <span id="timeline_end_time" class="timeline-time">LIVE</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div id="chart_legend" class="chart-legend">
+                <!-- Dynamically populated -->
+            </div>
+            <span id="buffer_status" style="font-size: 0.72rem; color: var(--text-muted);">Recorded: 0 samples</span>
+        </div>
+    </div>
+
+    <!-- System Status & Diagnostics Footer -->
+    <footer>
+        <div class="i2c-badges">
+            <span>I2C Devices:</span>
+            <span class="i2c-badge">BMP280 @ 0x76</span>
+            <span class="i2c-badge">GY-302 @ 0x23</span>
+            <span class="i2c-badge">GY-302 @ 0x5C</span>
+        </div>
+        <div>
+            <span id="last_updated">Awaiting first sync...</span>
+        </div>
+    </footer>
+
+</div>
+
+<script>
+    // -------------------------------------------------------------
+    // Global State & History Buffer
+    // -------------------------------------------------------------
+    const MAX_HISTORY = 1200; // Store up to 1200 samples (~20 min of history)
+    const WINDOW_SIZE = 40;   // Visible data window across canvas width
+    const historyData = {
+        timestamps: [],
+        temp: [],
+        piTemp: [],
+        pressure: [],
+        light1: [],
+        light2: []
+    };
+
+    let activeChartMode = 'temp'; // 'temp' | 'pressure' | 'light'
+    let pollIntervalMs = 1000;
+    let timerId = null;
+    let isPaused = false;
+    let consecutiveFailures = 0;
+
+    // Time Scrubbing & Dragging State
+    let viewOffset = 0; // 0 = viewing live head; >0 = scrolled back in time by N samples
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartOffset = 0;
+    let hoverX = null;
+
+    // DOM References
+    const canvasContainer = document.getElementById("canvas_container");
+    const elLiveJumpBtn = document.getElementById("live_jump_btn");
+    const elTimelineBadge = document.getElementById("timeline_mode_badge");
+    const elTimelineTrack = document.getElementById("timeline_track");
+    const elTimelineHandle = document.getElementById("timeline_viewport_handle");
+    const elTimelineStart = document.getElementById("timeline_start_time");
+    const elTimelineEnd = document.getElementById("timeline_end_time");
+    const elDragHint = document.getElementById("drag_hint");
+
+    const elCardPi = document.getElementById("card_pi");
+    const elPiTemp = document.getElementById("pi_temperature");
+    const elPiTempUnit = document.getElementById("pi_temp_unit");
+    const elPiMeter = document.getElementById("pi_temp_meter");
+    const elPiStatus = document.getElementById("pi_status_label");
+    const elPiAlertPill = document.getElementById("pi_alert_pill");
+    const elAlertEmailInput = document.getElementById("alert_email_input");
+    const elSendTestEmailBtn = document.getElementById("send_test_email_btn");
+    const elEmail10sCounter = document.getElementById("email_10s_counter");
+    const elEmailLastSentStatus = document.getElementById("email_last_sent_status");
+
+    const elTemp = document.getElementById("temperature");
+    const elTempFahrenheit = document.getElementById("temp_fahrenheit");
+    const elTempMeter = document.getElementById("temp_meter");
+
+    const elPressure = document.getElementById("pressure");
+    const elPressureHpa = document.getElementById("pressure_hpa");
+    const elPressureMeter = document.getElementById("pressure_meter");
+
+    const elLight1 = document.getElementById("light_1_lux");
+    const elLight2 = document.getElementById("light_2_lux");
+    const elLight1Desc = document.getElementById("light_1_desc");
+    const elLight2Desc = document.getElementById("light_2_desc");
+    const elLightDiff = document.getElementById("light_diff");
+
+    const elConnectionPill = document.getElementById("connection_pill");
+    const elConnectionText = document.getElementById("connection_text");
+    const elLastUpdated = document.getElementById("last_updated");
+    const elBufferStatus = document.getElementById("buffer_status");
+    const elChartLegend = document.getElementById("chart_legend");
+
+    const elPauseBtn = document.getElementById("pause_btn");
+    const elPauseText = document.getElementById("pause_text");
+    const elRefreshSelect = document.getElementById("refresh_rate_select");
+    const canvas = document.getElementById("telemetryCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // -------------------------------------------------------------
+    // Abnormal Lux Delta State & Elements
+    // -------------------------------------------------------------
+    const elCardLight = document.getElementById("card_light");
+    const elLightRateChange = document.getElementById("light_rate_change");
+    const elLightAlertPill = document.getElementById("light_alert_pill");
+    const elLuxThresholdInput = document.getElementById("lux_threshold_input");
+    const elLuxAlertBanner = document.getElementById("lux_alert_banner");
+    const elLuxAlertMsg = document.getElementById("lux_alert_msg");
+    const elAlertDismissBtn = document.getElementById("alert_dismiss_btn");
+    const elAlertProgressBar = document.getElementById("alert_progress_bar");
+    const elAlertSoundBtn = document.getElementById("alert_sound_btn");
+    const elSoundText = document.getElementById("sound_text");
+    const elSoundWaves = document.getElementById("sound_waves");
+    const elNotifyPermBtn = document.getElementById("notify_perm_btn");
+    const elNotifyPermText = document.getElementById("notify_perm_text");
+
+    const elChartAvgBadge = document.getElementById("chart_avg_badge");
+
+    let prevSensorDiff = null;
+    let lastAlertTimestamp = 0;
+    let alertDismissedForCurrentCycle = false;
+    let currentAlertActive = false;
+    let luxAlertTimer = null;
+    const ALERT_HOLD_MS = 20000; // Hold notification visible for 20 seconds instead of 1 second
+
+    // 10-Second Sustained Lux Anomaly Tracking
+    let anomalyActive = false;
+    let anomalyStartTime = null;
+    let anomalyBaselineDiff = null;
+    let anomalyNotified = false;
+    let anomalyShiftAmount = 0;
+
+    // CPU Temperature Threshold Tracking (>50°C Alert, >=45°C Pending)
+    let lastCpuAlertTime = 0;
+    let cpuAlertActive = false;
+    let cpuOverThresholdStart = null;
+    let lastCpuEmailDispatchedAt = 0;
+    const EMAIL_COOLDOWN_MS = 60000; // Throttle emails to at most 1 per minute while sustained
+
+    function hideLuxAlert() {
+        if (luxAlertTimer) {
+            clearTimeout(luxAlertTimer);
+            luxAlertTimer = null;
+        }
+        if (elAlertProgressBar) {
+            elAlertProgressBar.classList.remove("animate");
+        }
+        if (elLuxAlertBanner) elLuxAlertBanner.style.display = "none";
+        if (elCardLight) elCardLight.classList.remove("is-abnormal");
+        if (elLightAlertPill) elLightAlertPill.style.display = "none";
+        currentAlertActive = false;
+    }
+
+    function showAlertBanner(title, htmlMsg) {
+        if (elLuxAlertBanner) {
+            const titleEl = elLuxAlertBanner.querySelector(".alert-banner-title");
+            if (titleEl && title) titleEl.textContent = title;
+            if (elLuxAlertMsg && htmlMsg) elLuxAlertMsg.innerHTML = htmlMsg;
+            elLuxAlertBanner.style.display = "block";
+            if (elAlertProgressBar) {
+                elAlertProgressBar.classList.remove("animate");
+                void elAlertProgressBar.offsetWidth;
+                elAlertProgressBar.classList.add("animate");
+            }
+        }
+        currentAlertActive = true;
+        if (luxAlertTimer) clearTimeout(luxAlertTimer);
+        luxAlertTimer = setTimeout(() => {
+            hideLuxAlert();
+        }, ALERT_HOLD_MS);
+    }
+
+    // -------------------------------------------------------------
+    // Email Alert Dispatcher Client
+    // -------------------------------------------------------------
+    function triggerEmailAlert(alertType, detailMessage, measuredVal, limitVal) {
+        const email = elAlertEmailInput ? elAlertEmailInput.value.trim() : "";
+        if (!email) {
+            if (elEmailLastSentStatus) {
+                elEmailLastSentStatus.textContent = "⚠️ No recipient email configured; skipped email dispatch.";
+                elEmailLastSentStatus.style.color = "var(--accent-amber)";
+            }
+            return;
+        }
+
+        if (elEmailLastSentStatus) {
+            elEmailLastSentStatus.textContent = "⏳ Dispatching email notification...";
+            elEmailLastSentStatus.style.color = "var(--accent-cyan)";
+        }
+
+        fetch("/api/send_email_alert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: email,
+                type: alertType,
+                message: detailMessage,
+                value: measuredVal,
+                threshold: limitVal
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("HTTP error " + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (elEmailLastSentStatus) {
+                const timeStr = new Date().toLocaleTimeString();
+                elEmailLastSentStatus.textContent = `✅ Alert dispatched to <${email}> at ${timeStr}`;
+                elEmailLastSentStatus.style.color = "var(--accent-emerald)";
+            }
+        })
+        .catch(err => {
+            console.warn("Email alert dispatch notice:", err);
+            if (elEmailLastSentStatus) {
+                const timeStr = new Date().toLocaleTimeString();
+                elEmailLastSentStatus.textContent = `ℹ️ Alert logged locally at ${timeStr} (restart app in Thonny for live relay)`;
+                elEmailLastSentStatus.style.color = "var(--accent-amber)";
+            }
+        });
+    }
+
+    // -------------------------------------------------------------
+    // Web Audio API Chime & Desktop Notification
+    // -------------------------------------------------------------
+    let audioCtx = null;
+    let soundEnabled = localStorage.getItem("bioedge_sound_enabled") !== "false";
+
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                audioCtx = new AudioContextClass();
+            }
+        }
+        if (audioCtx && audioCtx.state === "suspended") {
+            audioCtx.resume().catch(() => {});
+        }
+        return audioCtx;
+    }
+
+    // Auto-unlock audio on any first user gesture
+    function unlockAudio() {
+        getAudioContext();
+        window.removeEventListener("click", unlockAudio);
+        window.removeEventListener("keydown", unlockAudio);
+        window.removeEventListener("touchstart", unlockAudio);
+    }
+    window.addEventListener("click", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+
+    function playAlertChime() {
+        if (!soundEnabled) return;
+        const aCtx = getAudioContext();
+        if (!aCtx) return;
+
+        try {
+            const now = aCtx.currentTime;
+            
+            // Oscillator 1 (tone 1: 587.33 Hz - D5)
+            const osc1 = aCtx.createOscillator();
+            const gain1 = aCtx.createGain();
+            osc1.type = "sine";
+            osc1.frequency.setValueAtTime(587.33, now);
+            gain1.gain.setValueAtTime(0.2, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+            osc1.connect(gain1);
+            gain1.connect(aCtx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.28);
+
+            // Oscillator 2 (tone 2: 880 Hz - A5)
+            const osc2 = aCtx.createOscillator();
+            const gain2 = aCtx.createGain();
+            osc2.type = "sine";
+            osc2.frequency.setValueAtTime(880, now + 0.14);
+            gain2.gain.setValueAtTime(0.001, now);
+            gain2.gain.setValueAtTime(0.22, now + 0.14);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            osc2.connect(gain2);
+            gain2.connect(aCtx.destination);
+            osc2.start(now + 0.14);
+            osc2.stop(now + 0.5);
+        } catch (err) {
+            console.warn("Could not play alert chime:", err);
+        }
+    }
+
+    function sendDesktopNotification(title, body) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            try {
+                new Notification(title, {
+                    body: body,
+                    tag: "bioedge-lux-alert",
+                    renotify: true,
+                    requireInteraction: true
+                });
+            } catch (e) {
+                console.warn("Desktop notification error:", e);
+            }
+        }
+    }
+
+    function updateNotificationBtnUI() {
+        if (!("Notification" in window)) {
+            if (elNotifyPermBtn) elNotifyPermBtn.style.display = "none";
+            return;
+        }
+        if (Notification.permission === "granted") {
+            if (elNotifyPermBtn) {
+                elNotifyPermBtn.style.display = "inline-flex";
+                elNotifyPermBtn.style.borderColor = "var(--accent-emerald)";
+                elNotifyPermBtn.style.color = "var(--accent-emerald)";
+                if (elNotifyPermText) elNotifyPermText.textContent = "Alerts Active";
+            }
+        } else if (Notification.permission === "denied") {
+            if (elNotifyPermBtn) {
+                elNotifyPermBtn.style.display = "inline-flex";
+                elNotifyPermBtn.style.opacity = "0.6";
+                if (elNotifyPermText) elNotifyPermText.textContent = "Alerts Blocked";
+            }
+        } else {
+            if (elNotifyPermBtn) {
+                elNotifyPermBtn.style.display = "inline-flex";
+                if (elNotifyPermText) elNotifyPermText.textContent = "Desktop Alerts";
+            }
+        }
+    }
+
+    function updateSoundBtnUI() {
+        if (elSoundText) elSoundText.textContent = soundEnabled ? "Audio ON" : "Muted";
+        if (elSoundWaves) elSoundWaves.style.display = soundEnabled ? "block" : "none";
+        if (elAlertSoundBtn) {
+            elAlertSoundBtn.style.opacity = soundEnabled ? "1" : "0.65";
+            elAlertSoundBtn.style.borderColor = soundEnabled ? "" : "var(--accent-amber)";
+        }
+    }
+
+
+    // -------------------------------------------------------------
+    // Helper: Light Level Description
+    // -------------------------------------------------------------
+    function describeLux(lux) {
+        if (lux === null || lux === undefined) return "Offline";
+        if (lux < 2) return "Pitch Dark";
+        if (lux < 50) return "Dim Ambient";
+        if (lux < 300) return "Normal Indoor";
+        if (lux < 1000) return "Bright Studio";
+        return "Direct Sunlight";
+    }
+
+    // -------------------------------------------------------------
+    // Helper: Update Timeline UI
+    // -------------------------------------------------------------
+    function updateTimelineUI() {
+        const total = historyData.timestamps.length;
+        if (total === 0) return;
+
+        elBufferStatus.textContent = `Recorded: ${total} sample${total > 1 ? 's' : ''}`;
+        elTimelineStart.textContent = historyData.timestamps[0] || "--:--:--";
+        elTimelineEnd.textContent = historyData.timestamps[total - 1] || "LIVE";
+
+        if (viewOffset > 0) {
+            elLiveJumpBtn.style.display = "inline-flex";
+            elTimelineBadge.style.display = "inline-flex";
+            elTimelineBadge.textContent = `◀ PAST (-${viewOffset}s)`;
+        } else {
+            elLiveJumpBtn.style.display = "none";
+            elTimelineBadge.style.display = "none";
+        }
+
+        // Calculate slider handle position
+        if (total <= WINDOW_SIZE) {
+            elTimelineHandle.style.left = "0%";
+            elTimelineHandle.style.width = "100%";
+        } else {
+            const startIndex = Math.max(0, total - viewOffset - WINDOW_SIZE);
+            const leftPct = (startIndex / total) * 100;
+            const widthPct = (WINDOW_SIZE / total) * 100;
+            elTimelineHandle.style.left = `${leftPct.toFixed(1)}%`;
+            elTimelineHandle.style.width = `${Math.max(widthPct, 3).toFixed(1)}%`;
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Fetch and Update
+    // -------------------------------------------------------------
+    function updateSensors() {
+        if (isPaused) return;
+
+        fetch("/data")
+            .then(res => {
+                if (!res.ok) throw new Error("HTTP error " + res.status);
+                return res.json();
+            })
+            .then(data => {
+                consecutiveFailures = 0;
+                setConnectionStatus('online', 'LIVE STREAMING');
+
+                const now = new Date();
+                const timeLabel = now.toTimeString().split(" ")[0];
+
+                // 1. Process Pi CPU Temperature
+                let rawPiStr = data.pi_temperature || "";
+                let piNum = null;
+                const piMatch = rawPiStr.match(/([0-9.]+)/);
+                if (piMatch) {
+                    piNum = parseFloat(piMatch[1]);
+                    elPiTemp.textContent = piNum.toFixed(1);
+                    elPiTempUnit.style.display = "inline";
+
+                    // Pi temperature bar & status (calibrated 30°C to 65°C)
+                    const piPct = Math.min(Math.max(((piNum - 30) / 35) * 100, 5), 100);
+                    elPiMeter.style.width = piPct + "%";
+
+                    if (piNum > 50.0) {
+                        // CPU Overheating (> 50°C): Critical warning and notifications
+                        if (elCardPi) {
+                            elCardPi.classList.remove("is-pending");
+                            elCardPi.classList.add("is-overheating");
+                        }
+                        if (elPiAlertPill) {
+                            elPiAlertPill.style.display = "inline-flex";
+                            elPiAlertPill.className = "status-pill error";
+                            elPiAlertPill.textContent = `🚨 OVERHEAT (${piNum.toFixed(1)}°C)`;
+                        }
+                        elPiStatus.textContent = "OVERHEATING (>50°C)";
+                        elPiStatus.style.color = "var(--accent-rose)";
+                        elPiMeter.style.background = "var(--accent-rose)";
+
+                        // 10s Continuous Overheat Tracking for Email Alert
+                        const curTsCpu = Date.now();
+                        if (!cpuOverThresholdStart) cpuOverThresholdStart = curTsCpu;
+                        const elapsedSec = Math.floor((curTsCpu - cpuOverThresholdStart) / 1000);
+
+                        if (elEmail10sCounter) {
+                            elEmail10sCounter.textContent = `${elapsedSec}s / 10s (High: ${piNum.toFixed(1)}°C)`;
+                            elEmail10sCounter.style.color = "var(--accent-rose)";
+                        }
+
+                        if (elapsedSec >= 10 && (curTsCpu - lastCpuEmailDispatchedAt > EMAIL_COOLDOWN_MS)) {
+                            triggerEmailAlert(
+                                "CPU Overheating (>50°C for >10s)",
+                                `Raspberry Pi SoC Core Temperature has continuously exceeded 50.0°C for ${elapsedSec} consecutive seconds! Measured: ${piNum.toFixed(1)}°C.`,
+                                `${piNum.toFixed(1)}°C`,
+                                "> 50.0°C"
+                            );
+                            lastCpuEmailDispatchedAt = curTsCpu;
+                            if (elEmail10sCounter) {
+                                elEmail10sCounter.textContent = `🚨 Alert Dispatched (${elapsedSec}s / 10s)`;
+                            }
+                        }
+
+                        const nowTs = Date.now();
+                        if (!cpuAlertActive || (nowTs - lastCpuAlertTime > 60000)) {
+                            cpuAlertActive = true;
+                            lastCpuAlertTime = nowTs;
+
+                            sendDesktopNotification(
+                                "BioEdge • CPU Overheating Warning!",
+                                `SoC Core Temperature has exceeded 50°C (Current: ${piNum.toFixed(1)}°C)!`
+                            );
+
+                            playAlertChime();
+
+                            showAlertBanner(
+                                "⚠️ CPU OVERHEAT WARNING (>50°C)",
+                                `Raspberry Pi SoC Core Temperature has exceeded safe limit: <strong>${piNum.toFixed(1)}°C</strong> (Threshold: >50.0°C). Check cooling or reduce workload.`
+                            );
+                        }
+                    } else if (piNum >= 45.0) {
+                        // Pending Warning (45°C - 50°C): Visual warning state, not a real warning
+                        cpuOverThresholdStart = null;
+                        if (elCardPi) {
+                            elCardPi.classList.remove("is-overheating");
+                            elCardPi.classList.add("is-pending");
+                        }
+                        if (elPiAlertPill) {
+                            elPiAlertPill.style.display = "inline-flex";
+                            elPiAlertPill.className = "status-pill paused";
+                            elPiAlertPill.textContent = "⚠️ PENDING WARNING";
+                        }
+                        elPiStatus.textContent = "Pending Warning (≥45°C)";
+                        elPiStatus.style.color = "var(--accent-amber)";
+                        elPiMeter.style.background = "var(--accent-amber)";
+                        if (elEmail10sCounter) {
+                            elEmail10sCounter.textContent = "0s / 10s (Pending Warning)";
+                            elEmail10sCounter.style.color = "var(--accent-amber)";
+                        }
+                        cpuAlertActive = false;
+                    } else {
+                        // Optimal (< 45°C): Normal state
+                        cpuOverThresholdStart = null;
+                        if (elCardPi) {
+                            elCardPi.classList.remove("is-overheating");
+                            elCardPi.classList.remove("is-pending");
+                        }
+                        if (elPiAlertPill) {
+                            elPiAlertPill.style.display = "none";
+                        }
+                        elPiStatus.textContent = "Optimal";
+                        elPiStatus.style.color = "var(--accent-emerald)";
+                        elPiMeter.style.background = "linear-gradient(90deg, #06b6d4, #3b82f6)";
+                        if (elEmail10sCounter) {
+                            elEmail10sCounter.textContent = "0s / 10s (Optimal)";
+                            elEmail10sCounter.style.color = "var(--accent-emerald)";
+                        }
+                        cpuAlertActive = false;
+                    }
+                } else {
+                    cpuOverThresholdStart = null;
+                    if (elCardPi) {
+                        elCardPi.classList.remove("is-overheating");
+                        elCardPi.classList.remove("is-pending");
+                    }
+                    if (elPiAlertPill) elPiAlertPill.style.display = "none";
+                    if (elEmail10sCounter) {
+                        elEmail10sCounter.textContent = "0s / 10s (--°C)";
+                        elEmail10sCounter.style.color = "var(--text-muted)";
+                    }
+                    elPiTemp.textContent = rawPiStr || "--";
+                    elPiTempUnit.style.display = "none";
+                }
+
+                // 2. Process BMP280 Temperature
+                let ambientTemp = null;
+                if (data.temperature !== null && data.temperature !== undefined) {
+                    ambientTemp = Number(data.temperature);
+                    elTemp.textContent = ambientTemp.toFixed(1);
+
+                    const fVal = (ambientTemp * 9 / 5) + 32;
+                    elTempFahrenheit.textContent = `${fVal.toFixed(1)} °F`;
+
+                    const tempPct = Math.min(Math.max(((ambientTemp - 0) / 45) * 100, 5), 100);
+                    elTempMeter.style.width = tempPct + "%";
+                } else {
+                    elTemp.textContent = "--";
+                    elTempFahrenheit.textContent = "-- °F";
+                }
+
+                // 3. Process Pressure (Primary: mmHg, Secondary: hPa)
+                let pressMmHg = null;
+                let pressHpa = null;
+                if (data.pressure_mmhg !== null && data.pressure_mmhg !== undefined) {
+                    pressMmHg = Number(data.pressure_mmhg);
+                } else if (data.pressure !== null && data.pressure !== undefined) {
+                    pressMmHg = Number(data.pressure) * 0.750062;
+                }
+
+                if (data.pressure !== null && data.pressure !== undefined) {
+                    pressHpa = Number(data.pressure);
+                } else if (pressMmHg !== null) {
+                    pressHpa = pressMmHg / 0.750062;
+                }
+
+                if (pressMmHg !== null) {
+                    elPressure.textContent = pressMmHg.toFixed(1);
+                    // Progress meter calibrated for mmHg (normal range: ~710 to 810 mmHg, sea level ~760)
+                    const pressPct = Math.min(Math.max(((pressMmHg - 710) / 100) * 100, 5), 100);
+                    elPressureMeter.style.width = pressPct + "%";
+                } else {
+                    elPressure.textContent = "--";
+                }
+
+                if (elPressureHpa) {
+                    elPressureHpa.textContent = pressHpa !== null ? pressHpa.toFixed(1) : "--";
+                }
+
+                // 4. Process GY-302 Light Sensors
+                const lux1 = (data.light_1_lux !== null && data.light_1_lux !== undefined) ? Number(data.light_1_lux) : null;
+                const lux2 = (data.light_2_lux !== null && data.light_2_lux !== undefined) ? Number(data.light_2_lux) : null;
+
+                elLight1.textContent = lux1 !== null ? lux1.toFixed(1) : "--";
+                elLight2.textContent = lux2 !== null ? lux2.toFixed(1) : "--";
+
+                elLight1Desc.textContent = describeLux(lux1);
+                elLight2Desc.textContent = describeLux(lux2);
+
+                if (lux1 !== null && lux2 !== null) {
+                    const currentDiff = Math.abs(lux1 - lux2);
+                    elLightDiff.textContent = `Δ ${currentDiff.toFixed(1)} Lux`;
+
+                    let deltaChange = 0;
+                    if (prevSensorDiff !== null) {
+                        deltaChange = Math.abs(currentDiff - prevSensorDiff);
+                        const sign = (currentDiff >= prevSensorDiff) ? '+' : '-';
+                        if (elLightRateChange) {
+                            elLightRateChange.textContent = `(shift: ${sign}${deltaChange.toFixed(1)} Lux)`;
+                        }
+                    } else {
+                        if (elLightRateChange) elLightRateChange.textContent = '';
+                    }
+
+                    const threshold = parseFloat(elLuxThresholdInput ? elLuxThresholdInput.value : 50) || 50;
+
+                    // Abnormal condition: Sudden change in difference between the two sensors >= threshold
+                    const isSuddenShift = (prevSensorDiff !== null && deltaChange >= threshold);
+
+                    if (isSuddenShift && !anomalyActive) {
+                        // Start tracking the 10-second anomaly persistence window
+                        anomalyActive = true;
+                        anomalyStartTime = Date.now();
+                        anomalyBaselineDiff = prevSensorDiff;
+                        anomalyShiftAmount = deltaChange;
+                        anomalyNotified = false;
+                        alertDismissedForCurrentCycle = false;
+                    }
+
+                    if (anomalyActive) {
+                        // Check if the differential remains shifted relative to baseline
+                        const shiftFromBaseline = Math.abs(currentDiff - (anomalyBaselineDiff !== null ? anomalyBaselineDiff : currentDiff));
+                        if (deltaChange >= threshold) {
+                            anomalyShiftAmount = Math.max(anomalyShiftAmount, deltaChange);
+                        }
+                        const isPersisting = (shiftFromBaseline >= threshold * 0.75) || (deltaChange >= threshold);
+
+                        if (isPersisting) {
+                            const elapsedSec = Math.floor((Date.now() - anomalyStartTime) / 1000);
+
+                            if (elapsedSec >= 10) {
+                                // Condition has persisted for 10 seconds: send notifications once
+                                if (!anomalyNotified && !alertDismissedForCurrentCycle) {
+                                    anomalyNotified = true;
+                                    currentAlertActive = true;
+
+                                    // 1. Visual banner with auto-dismiss after 20 seconds
+                                    showAlertBanner(
+                                        "⚠️ SUSTAINED ABNORMAL LUX DELTA (>10s)",
+                                        `Sudden shift in differential lux (<strong>Δ ${anomalyShiftAmount.toFixed(1)} Lux</strong>) has persisted for <strong>${elapsedSec}s</strong> (Threshold: ${threshold} Lux).<br>Sensor 1: <strong>${lux1.toFixed(1)} Lux</strong>, Sensor 2: <strong>${lux2.toFixed(1)} Lux</strong> (Current diff: ${currentDiff.toFixed(1)} Lux at ${timeLabel}).`
+                                    );
+
+                                    // 2. Acoustic chime & Desktop push notification
+                                    playAlertChime();
+                                    sendDesktopNotification(
+                                        "BioEdge • Abnormal Lux Delta Alert (10s)",
+                                        `Sensor difference shift of Δ ${anomalyShiftAmount.toFixed(1)} Lux has persisted for over 10 seconds! S1: ${lux1.toFixed(1)} Lux, S2: ${lux2.toFixed(1)} Lux.`
+                                    );
+                                }
+
+                                // Active sustained highlight on card
+                                if (elCardLight) elCardLight.classList.add("is-abnormal");
+                                if (elLightAlertPill) {
+                                    elLightAlertPill.style.display = "inline-flex";
+                                    elLightAlertPill.className = "status-pill error";
+                                    elLightAlertPill.textContent = `🚨 ABNORMAL (Persisted ${elapsedSec}s)`;
+                                }
+                                if (elLightRateChange) {
+                                    elLightRateChange.textContent = `(shift: ${sign}${deltaChange.toFixed(1)} Lux | sustained ${elapsedSec}s)`;
+                                }
+                            } else {
+                                // Condition pending (< 10 seconds): show pending indicator without firing notifications
+                                if (elCardLight) elCardLight.classList.add("is-abnormal");
+                                if (elLightAlertPill) {
+                                    elLightAlertPill.style.display = "inline-flex";
+                                    elLightAlertPill.className = "status-pill paused";
+                                    elLightAlertPill.textContent = `⏳ SHIFT PENDING (${elapsedSec}s / 10s)`;
+                                }
+                                if (elLightRateChange) {
+                                    elLightRateChange.textContent = `(shift: ${sign}${deltaChange.toFixed(1)} Lux | persisting ${elapsedSec}s/10s)`;
+                                }
+                            }
+                        } else {
+                            // Abnormal condition cleared before reaching 10s or returned to baseline
+                            anomalyActive = false;
+                            anomalyStartTime = null;
+                            anomalyBaselineDiff = null;
+                            anomalyNotified = false;
+
+                            if (!currentAlertActive) {
+                                if (elCardLight) elCardLight.classList.remove("is-abnormal");
+                                if (elLightAlertPill) elLightAlertPill.style.display = "none";
+                                if (elLuxAlertBanner) elLuxAlertBanner.style.display = "none";
+                            }
+                        }
+                    } else {
+                        // Normal state: keep notification visible if 20s hold timer is active
+                        if (!currentAlertActive) {
+                            if (elCardLight) elCardLight.classList.remove("is-abnormal");
+                            if (elLightAlertPill) elLightAlertPill.style.display = "none";
+                            if (elLuxAlertBanner) elLuxAlertBanner.style.display = "none";
+                        }
+                    }
+
+                    prevSensorDiff = currentDiff;
+                } else {
+                    elLightDiff.textContent = "--";
+                    if (elLightRateChange) elLightRateChange.textContent = "";
+                    if (elCardLight) elCardLight.classList.remove("is-abnormal");
+                    if (elLightAlertPill) elLightAlertPill.style.display = "none";
+                }
+
+
+                // 5. Append to History Buffer
+                if (historyData.timestamps.length >= MAX_HISTORY) {
+                    historyData.timestamps.shift();
+                    historyData.temp.shift();
+                    historyData.piTemp.shift();
+                    historyData.pressure.shift();
+                    historyData.light1.shift();
+                    historyData.light2.shift();
+                }
+
+                historyData.timestamps.push(timeLabel);
+                historyData.temp.push(ambientTemp);
+                historyData.piTemp.push(piNum);
+                historyData.pressure.push(pressMmHg);
+                historyData.light1.push(lux1);
+                historyData.light2.push(lux2);
+
+                // If user is inspecting past data, increment viewOffset so the viewport stays locked on the exact historical moments
+                if (viewOffset > 0) {
+                    const maxOffset = Math.max(0, historyData.timestamps.length - WINDOW_SIZE);
+                    viewOffset = Math.min(maxOffset, viewOffset + 1);
+                }
+
+                elLastUpdated.textContent = `Last reading: ${timeLabel}`;
+                updateTimelineUI();
+
+                // Render Chart
+                renderChart();
+            })
+            .catch(err => {
+                consecutiveFailures++;
+                console.warn("Sensor fetch error:", err);
+                if (consecutiveFailures > 2) {
+                    setConnectionStatus('error', 'DISCONNECTED / RETRYING');
+                }
+            });
+    }
+
+    function setConnectionStatus(state, message) {
+        elConnectionPill.className = "status-pill " + (state === 'error' ? 'error' : state === 'paused' ? 'paused' : '');
+        elConnectionText.textContent = message;
+    }
+
+    // -------------------------------------------------------------
+    // Pure Canvas Real-Time Chart (Zero External Dependencies)
+    // -------------------------------------------------------------
+    function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+    }
+
+    function renderChart() {
+        resizeCanvas();
+        const rect = canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+        const isLight = currentTheme === "light";
+        const isRainbow = currentTheme === "rainbow";
+
+        const seriesList = [];
+
+        if (activeChartMode === 'temp') {
+            seriesList.push({
+                name: 'Ambient BMP280',
+                color: isRainbow ? '#ff007f' : '#f43f5e',
+                data: historyData.temp
+            });
+            seriesList.push({
+                name: 'Pi CPU Core',
+                color: isRainbow ? '#00e5ff' : '#06b6d4',
+                data: historyData.piTemp
+            });
+        } else if (activeChartMode === 'pressure') {
+            seriesList.push({
+                name: 'Pressure (mmHg)',
+                color: isRainbow ? '#c084fc' : '#818cf8',
+                data: historyData.pressure
+            });
+        } else if (activeChartMode === 'light') {
+            seriesList.push({
+                name: 'Sensor 1 (0x23)',
+                color: isRainbow ? '#fee440' : '#f59e0b',
+                data: historyData.light1
+            });
+            seriesList.push({
+                name: 'Sensor 2 (0x5C)',
+                color: isRainbow ? '#00f5d4' : '#10b981',
+                data: historyData.light2
+            });
+        }
+
+        // Update Legend
+        elChartLegend.innerHTML = seriesList.map(s => `
+            <div class="legend-item">
+                <span class="legend-color" style="background: ${s.color};"></span>
+                <span>${s.name}</span>
+            </div>
+        `).join('');
+
+        const total = historyData.timestamps.length;
+
+        if (total < 2) {
+            ctx.fillStyle = isRainbow ? '#d8b4fe' : (isLight ? '#64748b' : '#94a3b8');
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Collecting sensor stream...', width / 2, height / 2);
+            return;
+        }
+
+        // Determine visible window slice
+        let startIndex = 0;
+        let endIndex = total;
+        if (total > WINDOW_SIZE) {
+            endIndex = Math.max(WINDOW_SIZE, total - viewOffset);
+            startIndex = Math.max(0, endIndex - WINDOW_SIZE);
+        }
+
+        const visibleTimestamps = historyData.timestamps.slice(startIndex, endIndex);
+        const visibleSeries = seriesList.map(s => ({
+            name: s.name,
+            color: s.color,
+            data: s.data.slice(startIndex, endIndex)
+        }));
+
+        // Calculate Min and Max bounds across visible slice
+        let minVal = Infinity;
+        let maxVal = -Infinity;
+
+        visibleSeries.forEach(s => {
+            s.data.forEach(v => {
+                if (v !== null && !isNaN(v)) {
+                    if (v < minVal) minVal = v;
+                    if (v > maxVal) maxVal = v;
+                }
+            });
+        });
+
+        if (minVal === Infinity || maxVal === -Infinity) {
+            minVal = 0;
+            maxVal = 100;
+        } else if (minVal === maxVal) {
+            minVal -= 5;
+            maxVal += 5;
+        } else {
+            const padding = (maxVal - minVal) * 0.15;
+            minVal -= padding;
+            maxVal += padding;
+        }
+
+        const paddingLeft = 55;
+        const paddingRight = 20;
+        const paddingTop = 20;
+        const paddingBottom = 30;
+        const plotWidth = width - paddingLeft - paddingRight;
+        const plotHeight = height - paddingTop - paddingBottom;
+
+        // Draw horizontal gridlines & Y-Axis values
+        const gridSteps = 4;
+        ctx.strokeStyle = isRainbow ? 'rgba(192, 132, 252, 0.16)' : (isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.06)');
+        ctx.fillStyle = isRainbow ? '#d8b4fe' : (isLight ? '#475569' : '#64748b');
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        for (let i = 0; i <= gridSteps; i++) {
+            const yRatio = i / gridSteps;
+            const y = paddingTop + plotHeight * (1 - yRatio);
+            const val = minVal + (maxVal - minVal) * yRatio;
+
+            ctx.beginPath();
+            ctx.moveTo(paddingLeft, y);
+            ctx.lineTo(width - paddingRight, y);
+            ctx.stroke();
+
+            ctx.fillText(val.toFixed(1), paddingLeft - 8, y);
+        }
+
+        const count = visibleTimestamps.length;
+        const stepX = plotWidth / Math.max(WINDOW_SIZE - 1, count - 1);
+
+        // Draw Time labels on X-Axis (start, middle, end)
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = isRainbow ? '#c084fc' : (isLight ? '#64748b' : '#94a3b8');
+        ctx.font = '10px monospace';
+
+        if (count > 0) {
+            ctx.fillText(visibleTimestamps[0], paddingLeft, height - 22);
+            if (count > 10) {
+                const midIdx = Math.floor(count / 2);
+                ctx.fillText(visibleTimestamps[midIdx], paddingLeft + midIdx * stepX, height - 22);
+            }
+            ctx.fillText(visibleTimestamps[count - 1], paddingLeft + (count - 1) * stepX, height - 22);
+        }
+
+        // Draw Each Series Line
+        visibleSeries.forEach(series => {
+            const validPoints = [];
+            for (let i = 0; i < count; i++) {
+                const val = series.data[i];
+                if (val !== null && !isNaN(val)) {
+                    const x = paddingLeft + i * stepX;
+                    const y = paddingTop + plotHeight * (1 - (val - minVal) / (maxVal - minVal));
+                    validPoints.push({ x, y, val, idx: i });
+                }
+            }
+
+            if (validPoints.length < 2) return;
+
+            let strokeStyle = series.color;
+            if (isRainbow && visibleSeries.length === 1) {
+                const rainbowGrad = ctx.createLinearGradient(paddingLeft, 0, width - paddingRight, 0);
+                rainbowGrad.addColorStop(0.0, '#ff007f');
+                rainbowGrad.addColorStop(0.2, '#ff7a00');
+                rainbowGrad.addColorStop(0.4, '#ffee00');
+                rainbowGrad.addColorStop(0.6, '#00f076');
+                rainbowGrad.addColorStop(0.8, '#00c3ff');
+                rainbowGrad.addColorStop(1.0, '#aa00ff');
+                strokeStyle = rainbowGrad;
+            }
+
+            // Stroke line
+            ctx.strokeStyle = strokeStyle;
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            validPoints.forEach((pt, idx) => {
+                if (idx === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            });
+            ctx.stroke();
+
+            // Draw end dot
+            const lastPt = validPoints[validPoints.length - 1];
+            ctx.fillStyle = series.color;
+            ctx.beginPath();
+            ctx.arc(lastPt.x, lastPt.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Calculate and draw Average Reference Line for this series
+            const validVals = validPoints.map(p => p.val);
+            const seriesAvg = validVals.length > 0 ? (validVals.reduce((a, b) => a + b, 0) / validVals.length) : null;
+            if (seriesAvg !== null) {
+                const avgY = paddingTop + plotHeight * (1 - (seriesAvg - minVal) / (maxVal - minVal));
+                ctx.save();
+                ctx.setLineDash([5, 4]);
+                ctx.strokeStyle = series.color;
+                ctx.globalAlpha = 0.5;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(paddingLeft, avgY);
+                ctx.lineTo(width - paddingRight, avgY);
+                ctx.stroke();
+
+                // Average label on right margin
+                ctx.globalAlpha = 0.85;
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'right';
+                ctx.fillStyle = series.color;
+                ctx.fillText(`AVG: ${seriesAvg.toFixed(1)}`, width - paddingRight - 4, avgY - 4);
+                ctx.restore();
+            }
+        });
+
+        // Update Window Average Badge in Header
+        if (elChartAvgBadge) {
+            if (visibleSeries.length > 0) {
+                const primarySeries = visibleSeries[0];
+                const validVals = primarySeries.data.filter(v => v !== null && !isNaN(v));
+                if (validVals.length > 0) {
+                    const avg = validVals.reduce((a, b) => a + b, 0) / validVals.length;
+                    const unit = activeChartMode === 'temp' ? '°C' : (activeChartMode === 'pressure' ? 'mmHg' : 'Lux');
+                    elChartAvgBadge.textContent = `${primarySeries.name} Avg: ${avg.toFixed(1)} ${unit}`;
+                } else {
+                    elChartAvgBadge.textContent = "Window Avg: --";
+                }
+            } else {
+                elChartAvgBadge.textContent = "Window Avg: --";
+            }
+        }
+
+        // Interactive Hover Crosshair & Tooltip Box
+        if (hoverX !== null && hoverX >= paddingLeft && hoverX <= width - paddingRight && count > 0) {
+            const relativeX = hoverX - paddingLeft;
+            let closestIdx = Math.round(relativeX / stepX);
+            closestIdx = Math.max(0, Math.min(count - 1, closestIdx));
+            const pointX = paddingLeft + closestIdx * stepX;
+            const timeAtPoint = visibleTimestamps[closestIdx];
+
+            // Vertical dashed crosshair line
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = isRainbow ? 'rgba(236, 72, 153, 0.6)' : (isLight ? 'rgba(0, 0, 0, 0.35)' : 'rgba(255, 255, 255, 0.35)');
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(pointX, paddingTop);
+            ctx.lineTo(pointX, paddingTop + plotHeight);
+            ctx.stroke();
+            ctx.restore();
+
+            // Highlight points on curves
+            const tooltipLines = [`Time: ${timeAtPoint}`];
+            visibleSeries.forEach(series => {
+                const val = series.data[closestIdx];
+                if (val !== null && !isNaN(val)) {
+                    const y = paddingTop + plotHeight * (1 - (val - minVal) / (maxVal - minVal));
+                    ctx.fillStyle = series.color;
+                    ctx.beginPath();
+                    ctx.arc(pointX, y, 5.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    const seriesVals = series.data.filter(v => v !== null && !isNaN(v));
+                    const sAvg = seriesVals.length > 0 ? (seriesVals.reduce((a, b) => a + b, 0) / seriesVals.length) : null;
+                    const avgStr = sAvg !== null ? ` (Avg: ${sAvg.toFixed(1)})` : '';
+                    tooltipLines.push(`${series.name}: ${val.toFixed(1)}${avgStr}`);
+                }
+            });
+
+            // Draw Tooltip Box
+            ctx.font = '11px sans-serif';
+            let maxTextW = 0;
+            tooltipLines.forEach(l => {
+                const w = ctx.measureText(l).width;
+                if (w > maxTextW) maxTextW = w;
+            });
+
+            const boxW = maxTextW + 18;
+            const boxH = tooltipLines.length * 17 + 10;
+            let boxX = pointX + 12;
+            if (boxX + boxW > width - 10) boxX = pointX - boxW - 12;
+            let boxY = paddingTop + 10;
+
+            ctx.fillStyle = isRainbow ? 'rgba(20, 10, 48, 0.96)' : (isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)');
+            ctx.strokeStyle = isRainbow ? 'rgba(217, 70, 239, 0.5)' : (isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.2)');
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+            } else {
+                ctx.rect(boxX, boxY, boxW, boxH);
+            }
+            ctx.fill();
+            ctx.stroke();
+
+            tooltipLines.forEach((line, idx) => {
+                ctx.fillStyle = idx === 0 
+                    ? (isRainbow ? '#fdf4ff' : (isLight ? '#0f172a' : '#f8fafc')) 
+                    : (isRainbow ? '#e9d5ff' : (isLight ? '#475569' : '#cbd5e1'));
+                ctx.font = idx === 0 ? 'bold 11px monospace' : '11px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(line, boxX + 8, boxY + 16 + idx * 16);
+            });
+        }
+    }
+
+    // -------------------------------------------------------------
+    // History Scrubbing & Dragging Handlers
+    // -------------------------------------------------------------
+    function onDragStart(clientX) {
+        if (historyData.timestamps.length < 2) return;
+        isDragging = true;
+        dragStartX = clientX;
+        dragStartOffset = viewOffset;
+        canvasContainer.classList.add("is-dragging");
+        if (elDragHint) elDragHint.style.opacity = "0";
+    }
+
+    function onDragMove(clientX) {
+        if (!isDragging) return;
+        const rect = canvas.getBoundingClientRect();
+        const plotWidth = rect.width - 75;
+        const visibleCount = Math.min(WINDOW_SIZE, historyData.timestamps.length);
+        const pxPerSample = plotWidth / Math.max(1, visibleCount - 1);
+
+        const deltaPx = clientX - dragStartX;
+        const deltaSamples = Math.round(deltaPx / pxPerSample);
+
+        const maxOffset = Math.max(0, historyData.timestamps.length - WINDOW_SIZE);
+        // Dragging right scrubs backwards into history (increases offset)
+        viewOffset = Math.max(0, Math.min(maxOffset, dragStartOffset + deltaSamples));
+
+        updateTimelineUI();
+        renderChart();
+    }
+
+    function onDragEnd() {
+        if (!isDragging) return;
+        isDragging = false;
+        canvasContainer.classList.remove("is-dragging");
+    }
+
+    canvas.addEventListener("mousedown", (e) => onDragStart(e.clientX));
+    window.addEventListener("mousemove", (e) => {
+        if (isDragging) onDragMove(e.clientX);
+    });
+    window.addEventListener("mouseup", onDragEnd);
+
+    canvas.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 1) onDragStart(e.touches[0].clientX);
+    }, { passive: true });
+    window.addEventListener("touchmove", (e) => {
+        if (isDragging && e.touches.length === 1) onDragMove(e.touches[0].clientX);
+    }, { passive: true });
+    window.addEventListener("touchend", onDragEnd);
+
+    // Mouse hover tracking for crosshairs
+    canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        hoverX = e.clientX - rect.left;
+        if (!isDragging) renderChart();
+    });
+    canvas.addEventListener("mouseleave", () => {
+        hoverX = null;
+        if (!isDragging) renderChart();
+    });
+
+    // Mouse wheel scrubbing back and forth through time
+    canvas.addEventListener("wheel", (e) => {
+        if (historyData.timestamps.length < 2) return;
+        e.preventDefault();
+        const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+        const shift = delta > 0 ? -2 : 2;
+        const maxOffset = Math.max(0, historyData.timestamps.length - WINDOW_SIZE);
+        viewOffset = Math.max(0, Math.min(maxOffset, viewOffset + shift));
+        if (elDragHint) elDragHint.style.opacity = "0";
+        updateTimelineUI();
+        renderChart();
+    }, { passive: false });
+
+    // Jump to Live button
+    elLiveJumpBtn.addEventListener("click", () => {
+        viewOffset = 0;
+        updateTimelineUI();
+        renderChart();
+    });
+
+    // Timeline Scrubber Bar Click & Scrub
+    elTimelineTrack.addEventListener("click", (e) => {
+        const total = historyData.timestamps.length;
+        if (total <= WINDOW_SIZE) return;
+        const rect = elTimelineTrack.getBoundingClientRect();
+        const clickRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const maxOffset = total - WINDOW_SIZE;
+        // 0 on left = oldest data (maxOffset), 1 on right = live (0)
+        viewOffset = Math.round((1 - clickRatio) * maxOffset);
+        if (elDragHint) elDragHint.style.opacity = "0";
+        updateTimelineUI();
+        renderChart();
+    });
+
+    // -------------------------------------------------------------
+    // Controls & Interaction
+    // -------------------------------------------------------------
+    function setupPolling() {
+        if (timerId) clearInterval(timerId);
+        timerId = setInterval(updateSensors, pollIntervalMs);
+    }
+
+    elRefreshSelect.addEventListener("change", (e) => {
+        pollIntervalMs = parseInt(e.target.value, 10);
+        if (!isPaused) setupPolling();
+    });
+
+    elPauseBtn.addEventListener("click", () => {
+        isPaused = !isPaused;
+        if (isPaused) {
+            setConnectionStatus('paused', 'STREAM PAUSED');
+            elPauseText.textContent = "Resume";
+            elPauseBtn.style.borderColor = "var(--accent-amber)";
+        } else {
+            setConnectionStatus('online', 'LIVE STREAMING');
+            elPauseText.textContent = "Pause";
+            elPauseBtn.style.borderColor = "";
+            updateSensors();
+            setupPolling();
+        }
+    });
+
+    document.querySelectorAll(".chart-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            document.querySelectorAll(".chart-tab").forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+            activeChartMode = tab.dataset.chart;
+            renderChart();
+        });
+    });
+
+    window.addEventListener("resize", () => {
+        renderChart();
+    });
+
+    // -------------------------------------------------------------
+    // Theme Switcher (Dark / Light / Rainbow Mode)
+    // -------------------------------------------------------------
+    const elThemeToggleBtn = document.getElementById("theme_toggle_btn");
+    const elThemeOptDark = document.getElementById("theme_opt_dark");
+    const elThemeOptLight = document.getElementById("theme_opt_light");
+    const elThemeOptRainbow = document.getElementById("theme_opt_rainbow");
+
+    function applyTheme(theme) {
+        if (theme === "light") {
+            document.documentElement.setAttribute("data-theme", "light");
+            if (elThemeOptLight) elThemeOptLight.classList.add("active");
+            if (elThemeOptDark) elThemeOptDark.classList.remove("active");
+            if (elThemeOptRainbow) elThemeOptRainbow.classList.remove("active");
+            localStorage.setItem("bioedge_theme", "light");
+        } else if (theme === "rainbow") {
+            document.documentElement.setAttribute("data-theme", "rainbow");
+            if (elThemeOptRainbow) elThemeOptRainbow.classList.add("active");
+            if (elThemeOptDark) elThemeOptDark.classList.remove("active");
+            if (elThemeOptLight) elThemeOptLight.classList.remove("active");
+            localStorage.setItem("bioedge_theme", "rainbow");
+        } else {
+            document.documentElement.removeAttribute("data-theme");
+            if (elThemeOptDark) elThemeOptDark.classList.add("active");
+            if (elThemeOptLight) elThemeOptLight.classList.remove("active");
+            if (elThemeOptRainbow) elThemeOptRainbow.classList.remove("active");
+            localStorage.setItem("bioedge_theme", "dark");
+        }
+        renderChart();
+    }
+
+    const savedTheme = localStorage.getItem("bioedge_theme") || "dark";
+    applyTheme(savedTheme);
+
+    if (elThemeOptDark) {
+        elThemeOptDark.addEventListener("click", (e) => {
+            e.stopPropagation();
+            applyTheme("dark");
+        });
+    }
+
+    if (elThemeOptLight) {
+        elThemeOptLight.addEventListener("click", (e) => {
+            e.stopPropagation();
+            applyTheme("light");
+        });
+    }
+
+    if (elThemeOptRainbow) {
+        elThemeOptRainbow.addEventListener("click", (e) => {
+            e.stopPropagation();
+            applyTheme("rainbow");
+        });
+    }
+
+    elThemeToggleBtn.addEventListener("click", () => {
+        const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+        if (currentTheme === "dark") {
+            applyTheme("light");
+        } else if (currentTheme === "light") {
+            applyTheme("rainbow");
+        } else {
+            applyTheme("dark");
+        }
+    });
+
+    // -------------------------------------------------------------
+    // Abnormal Lux Delta Controls & Event Handlers
+    // -------------------------------------------------------------
+    // 1. Threshold Input Listener & Persistence
+    const savedLuxThreshold = localStorage.getItem("bioedge_lux_threshold") || "50";
+    if (elLuxThresholdInput) {
+        elLuxThresholdInput.value = savedLuxThreshold;
+        elLuxThresholdInput.addEventListener("change", (e) => {
+            let val = parseFloat(e.target.value);
+            if (isNaN(val) || val < 1) val = 50;
+            e.target.value = val;
+            localStorage.setItem("bioedge_lux_threshold", val);
+        });
+    }
+
+    // 2. Audio Chime Toggle Listener
+    if (elAlertSoundBtn) {
+        elAlertSoundBtn.addEventListener("click", () => {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem("bioedge_sound_enabled", soundEnabled);
+            updateSoundBtnUI();
+            if (soundEnabled) {
+                getAudioContext();
+                playAlertChime();
+            }
+        });
+    }
+
+    // 3. Desktop OS Notification Permission Listener
+    if (elNotifyPermBtn) {
+        elNotifyPermBtn.addEventListener("click", () => {
+            if ("Notification" in window) {
+                Notification.requestPermission().then((permission) => {
+                    updateNotificationBtnUI();
+                    if (permission === "granted") {
+                        sendDesktopNotification(
+                            "BioEdge Notifications Enabled",
+                            "You will receive desktop alerts when an abnormal lux delta is detected."
+                        );
+                    }
+                });
+            }
+        });
+    }
+
+    // 4. Alert Banner Dismiss Button
+    if (elAlertDismissBtn) {
+        elAlertDismissBtn.addEventListener("click", () => {
+            hideLuxAlert();
+            alertDismissedForCurrentCycle = true;
+            if (anomalyActive && prevSensorDiff !== null) {
+                anomalyBaselineDiff = prevSensorDiff;
+                anomalyActive = false;
+                anomalyStartTime = null;
+                anomalyNotified = false;
+            }
+        });
+    }
+
+    // 5. Alert Email Input Listener & Persistence
+    const savedAlertEmail = localStorage.getItem("bioedge_alert_email") || "";
+    if (elAlertEmailInput) {
+        elAlertEmailInput.value = savedAlertEmail;
+        elAlertEmailInput.addEventListener("input", (e) => {
+            localStorage.setItem("bioedge_alert_email", e.target.value.trim());
+        });
+    }
+
+    // 6. Manual Email Test Button
+    if (elSendTestEmailBtn) {
+        elSendTestEmailBtn.addEventListener("click", () => {
+            const email = elAlertEmailInput ? elAlertEmailInput.value.trim() : "";
+            if (!email) {
+                alert("Please enter an email address in the box first.");
+                if (elAlertEmailInput) elAlertEmailInput.focus();
+                return;
+            }
+            triggerEmailAlert(
+                "Manual Test Verification",
+                "This is a test notification confirming that your BioEdge email alerts are configured properly.",
+                "Normal",
+                "Manual Test"
+            );
+        });
+    }
+
+    // Initialize Audio & Notification UI states
+    updateSoundBtnUI();
+    updateNotificationBtnUI();
+
+    // Start Polling
+    updateSensors();
+    setupPolling();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs and FIFOs
+*.log
+alert_emails.log
+.lgd-nfy*
+
+# Environment and editor files
+.env
+.venv/
+env/
+venv/
+*.swp
+*~
+.DS_Store
