@@ -1308,8 +1308,8 @@
             </div>
 
             <div class="metric-secondary">
-                <span>Hectopascal (hPa)</span>
-                <span class="metric-secondary-val"><span id="pressure_hpa">--</span> hPa</span>
+                <span>Hectopascal Equivalent</span>
+                <span id="pressure_hpa" class="metric-secondary-val">-- hPa</span>
             </div>
         </div>
 
@@ -2011,32 +2011,31 @@
                     elTempFahrenheit.textContent = "-- °F";
                 }
 
-                // 3. Process Pressure (Primary: mmHg, Secondary: hPa)
+                // 3. Process BMP280 Pressure (Primary: mmHg, Secondary: hPa)
+                const HPA_TO_MMHG = 0.750062;
                 let pressMmHg = null;
                 let pressHpa = null;
+
                 if (data.pressure_mmhg !== null && data.pressure_mmhg !== undefined) {
                     pressMmHg = Number(data.pressure_mmhg);
+                    pressHpa = (data.pressure !== null && data.pressure !== undefined)
+                        ? Number(data.pressure)
+                        : (pressMmHg / HPA_TO_MMHG);
                 } else if (data.pressure !== null && data.pressure !== undefined) {
-                    pressMmHg = Number(data.pressure) * 0.750062;
-                }
-
-                if (data.pressure !== null && data.pressure !== undefined) {
                     pressHpa = Number(data.pressure);
-                } else if (pressMmHg !== null) {
-                    pressHpa = pressMmHg / 0.750062;
+                    pressMmHg = pressHpa * HPA_TO_MMHG;
                 }
 
                 if (pressMmHg !== null) {
                     elPressure.textContent = pressMmHg.toFixed(1);
+                    if (elPressureHpa) elPressureHpa.textContent = `${pressHpa.toFixed(1)} hPa`;
+
                     // Progress meter calibrated for mmHg (normal range: ~710 to 810 mmHg, sea level ~760)
                     const pressPct = Math.min(Math.max(((pressMmHg - 710) / 100) * 100, 5), 100);
                     elPressureMeter.style.width = pressPct + "%";
                 } else {
                     elPressure.textContent = "--";
-                }
-
-                if (elPressureHpa) {
-                    elPressureHpa.textContent = pressHpa !== null ? pressHpa.toFixed(1) : "--";
+                    if (elPressureHpa) elPressureHpa.textContent = "-- hPa";
                 }
 
                 // 4. Process GY-302 Light Sensors
