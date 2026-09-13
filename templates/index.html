@@ -1527,10 +1527,7 @@
     const elPiMeter = document.getElementById("pi_temp_meter");
     const elPiStatus = document.getElementById("pi_status_label");
     const elPiAlertPill = document.getElementById("pi_alert_pill");
-    const elAlertEmailInput = document.getElementById("alert_email_input");
-    const elSendTestEmailBtn = document.getElementById("send_test_email_btn");
-    const elEmail10sCounter = document.getElementById("email_10s_counter");
-    const elEmailLastSentStatus = document.getElementById("email_last_sent_status");
+
 
     const elTemp = document.getElementById("temperature");
     const elTempFahrenheit = document.getElementById("temp_fahrenheit");
@@ -1592,11 +1589,19 @@
     let anomalyShiftAmount = 0;
 
     // CPU Temperature Threshold Tracking (>50°C Alert, >=45°C Pending)
+    // CPU Temperature Threshold Tracking (>55°C Alert, >=45°C Pending)
     let lastCpuAlertTime = 0;
     let cpuAlertActive = false;
     let cpuOverThresholdStart = null;
+    let cpuStartTimeFormatted = null;
     let lastCpuEmailDispatchedAt = 0;
-    const EMAIL_COOLDOWN_MS = 60000; // Throttle emails to at most 1 per minute while sustained
+    const CPU_EMAIL_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown while sustained
+
+    // Illuminance Difference Threshold Tracking
+    let luxOverThresholdStart = null;
+    let luxStartTimeFormatted = null;
+    let lastLuxEmailDispatchedAt = 0;
+    const LUX_EMAIL_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown while sustained
 
     function hideLuxAlert() {
         if (luxAlertTimer) {
@@ -1635,25 +1640,10 @@
     // Email Alert Dispatcher Client
     // -------------------------------------------------------------
     function triggerEmailAlert(alertType, detailMessage, measuredVal, limitVal) {
-        const email = elAlertEmailInput ? elAlertEmailInput.value.trim() : "";
-        if (!email) {
-            if (elEmailLastSentStatus) {
-                elEmailLastSentStatus.textContent = "⚠️ No recipient email configured; skipped email dispatch.";
-                elEmailLastSentStatus.style.color = "var(--accent-amber)";
-            }
-            return;
-        }
-
-        if (elEmailLastSentStatus) {
-            elEmailLastSentStatus.textContent = "⏳ Dispatching email notification...";
-            elEmailLastSentStatus.style.color = "var(--accent-cyan)";
-        }
-
         fetch("/api/send_email_alert", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                email: email,
                 type: alertType,
                 message: detailMessage,
                 value: measuredVal,
@@ -1665,19 +1655,10 @@
             return res.json();
         })
         .then(data => {
-            if (elEmailLastSentStatus) {
-                const timeStr = new Date().toLocaleTimeString();
-                elEmailLastSentStatus.textContent = `✅ Alert dispatched to <${email}> at ${timeStr}`;
-                elEmailLastSentStatus.style.color = "var(--accent-emerald)";
-            }
+            console.log("Email alert dispatched to team list:", data);
         })
         .catch(err => {
             console.warn("Email alert dispatch notice:", err);
-            if (elEmailLastSentStatus) {
-                const timeStr = new Date().toLocaleTimeString();
-                elEmailLastSentStatus.textContent = `ℹ️ Alert logged locally at ${timeStr} (restart app in Thonny for live relay)`;
-                elEmailLastSentStatus.style.color = "var(--accent-amber)";
-            }
         });
     }
 
@@ -1848,8 +1829,6 @@
     // Fetch and Update
     // -------------------------------------------------------------
     function updateSensors() {
-        if (isPaused) return;
-
         fetch("/data")
             .then(res => {
                 if (!res.ok) throw new Error("HTTP error " + res.status);
@@ -1857,12 +1836,16 @@
             })
             .then(data => {
                 consecutiveFailures = 0;
-                setConnectionStatus('online', 'LIVE STREAMING');
+                if (!isPaused) {
+                    setConnectionStatus('online', 'LIVE STREAMING');
+                } else {
+                    setConnectionStatus('paused', 'STREAM PAUSED');
+                }
 
                 const now = new Date();
                 const timeLabel = now.toTimeString().split(" ")[0];
 
-                // 1. Process Pi CPU Temperature
+                // 1. Process Pi CPU Temperature (Monitored continuously EVEN IF app is paused)
                 let rawPiStr = data.pi_temperature || "";
                 let piNum = null;
                 const piMatch = rawPiStr.match(/([0-9.]+)/);
@@ -1871,12 +1854,12 @@
                     elPiTemp.textContent = piNum.toFixed(1);
                     elPiTempUnit.style.display = "inline";
 
-                    // Pi temperature bar & status (calibrated 30°C to 65°C)
-                    const piPct = Math.min(Math.max(((piNum - 30) / 35) * 100, 5), 100);
+                    // Pi temperature bar & status (calibrated 30°C to 70°C)
+                    const piPct = Math.min(Math.max(((piNum - 30) / 40) * 100, 5), 100);
                     elPiMeter.style.width = piPct + "%";
 
-                    if (piNum > 50.0) {
-                        // CPU Overheating (> 50°C): Critical warning and notifications
+                    if (piNum > 55.0) {
+                        // CPU Overheating (> 55°C): Critical warning and notifications
                         if (elCardPi) {
                             elCardPi.classList.remove("is-pending");
                             elCardPi.classList.add("is-overheating");
@@ -1886,31 +1869,28 @@
                             elPiAlertPill.className = "status-pill error";
                             elPiAlertPill.textContent = `🚨 OVERHEAT (${piNum.toFixed(1)}°C)`;
                         }
-                        elPiStatus.textContent = "OVERHEATING (>50°C)";
+                        elPiStatus.textContent = "OVERHEATING (>55°C)";
                         elPiStatus.style.color = "var(--accent-rose)";
                         elPiMeter.style.background = "var(--accent-rose)";
 
-                        // 10s Continuous Overheat Tracking for Email Alert
+                        // 10s Continuous Overheat Tracking for Email Alert:
+                        // If <persist> 10 seconds: Send email after 5 minutes
+                        // Else: Reset timer
                         const curTsCpu = Date.now();
-                        if (!cpuOverThresholdStart) cpuOverThresholdStart = curTsCpu;
+                        if (!cpuOverThresholdStart) {
+                            cpuOverThresholdStart = curTsCpu;
+                            cpuStartTimeFormatted = timeLabel;
+                        }
                         const elapsedSec = Math.floor((curTsCpu - cpuOverThresholdStart) / 1000);
 
-                        if (elEmail10sCounter) {
-                            elEmail10sCounter.textContent = `${elapsedSec}s / 10s (High: ${piNum.toFixed(1)}°C)`;
-                            elEmail10sCounter.style.color = "var(--accent-rose)";
-                        }
-
-                        if (elapsedSec >= 10 && (curTsCpu - lastCpuEmailDispatchedAt > EMAIL_COOLDOWN_MS)) {
+                        if (elapsedSec >= 10 && (curTsCpu - lastCpuEmailDispatchedAt >= CPU_EMAIL_COOLDOWN_MS)) {
                             triggerEmailAlert(
-                                "CPU Overheating (>50°C for >10s)",
-                                `Raspberry Pi SoC Core Temperature has continuously exceeded 50.0°C for ${elapsedSec} consecutive seconds! Measured: ${piNum.toFixed(1)}°C.`,
+                                "CPU temperature warning",
+                                `Over heat ${piNum.toFixed(1)}°C for ${elapsedSec}s since ${cpuStartTimeFormatted}`,
                                 `${piNum.toFixed(1)}°C`,
-                                "> 50.0°C"
+                                "> 55.0°C"
                             );
                             lastCpuEmailDispatchedAt = curTsCpu;
-                            if (elEmail10sCounter) {
-                                elEmail10sCounter.textContent = `🚨 Alert Dispatched (${elapsedSec}s / 10s)`;
-                            }
                         }
 
                         const nowTs = Date.now();
@@ -1920,19 +1900,20 @@
 
                             sendDesktopNotification(
                                 "BioEdge • CPU Overheating Warning!",
-                                `SoC Core Temperature has exceeded 50°C (Current: ${piNum.toFixed(1)}°C)!`
+                                `SoC Core Temperature has exceeded 55°C (Current: ${piNum.toFixed(1)}°C)!`
                             );
 
                             playAlertChime();
 
                             showAlertBanner(
-                                "⚠️ CPU OVERHEAT WARNING (>50°C)",
-                                `Raspberry Pi SoC Core Temperature has exceeded safe limit: <strong>${piNum.toFixed(1)}°C</strong> (Threshold: >50.0°C). Check cooling or reduce workload.`
+                                "⚠️ CPU OVERHEAT WARNING (>55°C)",
+                                `Raspberry Pi SoC Core Temperature has exceeded safe limit: <strong>${piNum.toFixed(1)}°C</strong> (Threshold: >55.0°C). Check cooling or reduce workload.`
                             );
                         }
                     } else if (piNum >= 45.0) {
-                        // Pending Warning (45°C - 50°C): Visual warning state, not a real warning
+                        // Pending Warning (45°C - 55°C): Visual warning state, reset 10s overheat timer
                         cpuOverThresholdStart = null;
+                        cpuStartTimeFormatted = null;
                         if (elCardPi) {
                             elCardPi.classList.remove("is-overheating");
                             elCardPi.classList.add("is-pending");
@@ -1945,14 +1926,11 @@
                         elPiStatus.textContent = "Pending Warning (≥45°C)";
                         elPiStatus.style.color = "var(--accent-amber)";
                         elPiMeter.style.background = "var(--accent-amber)";
-                        if (elEmail10sCounter) {
-                            elEmail10sCounter.textContent = "0s / 10s (Pending Warning)";
-                            elEmail10sCounter.style.color = "var(--accent-amber)";
-                        }
                         cpuAlertActive = false;
                     } else {
-                        // Optimal (< 45°C): Normal state
+                        // Optimal (< 45°C): Normal state, reset timer
                         cpuOverThresholdStart = null;
+                        cpuStartTimeFormatted = null;
                         if (elCardPi) {
                             elCardPi.classList.remove("is-overheating");
                             elCardPi.classList.remove("is-pending");
@@ -1963,25 +1941,23 @@
                         elPiStatus.textContent = "Optimal";
                         elPiStatus.style.color = "var(--accent-emerald)";
                         elPiMeter.style.background = "linear-gradient(90deg, #06b6d4, #3b82f6)";
-                        if (elEmail10sCounter) {
-                            elEmail10sCounter.textContent = "0s / 10s (Optimal)";
-                            elEmail10sCounter.style.color = "var(--accent-emerald)";
-                        }
                         cpuAlertActive = false;
                     }
                 } else {
                     cpuOverThresholdStart = null;
+                    cpuStartTimeFormatted = null;
                     if (elCardPi) {
                         elCardPi.classList.remove("is-overheating");
                         elCardPi.classList.remove("is-pending");
                     }
                     if (elPiAlertPill) elPiAlertPill.style.display = "none";
-                    if (elEmail10sCounter) {
-                        elEmail10sCounter.textContent = "0s / 10s (--°C)";
-                        elEmail10sCounter.style.color = "var(--text-muted)";
-                    }
                     elPiTemp.textContent = rawPiStr || "--";
                     elPiTempUnit.style.display = "none";
+                }
+
+                // If paused, skip telemetry history appending, chart re-renders, and illuminance alerts
+                if (isPaused) {
+                    return;
                 }
 
                 // 2. Process BMP280 Temperature
@@ -2054,87 +2030,55 @@
 
                     const threshold = parseFloat(elLuxThresholdInput ? elLuxThresholdInput.value : 50) || 50;
 
-                    // Abnormal condition: Sudden change in difference between the two sensors >= threshold
-                    const isSuddenShift = (prevSensorDiff !== null && deltaChange >= threshold);
-
-                    if (isSuddenShift && !anomalyActive) {
-                        // Start tracking the 10-second anomaly persistence window
-                        anomalyActive = true;
-                        anomalyStartTime = Date.now();
-                        anomalyBaselineDiff = prevSensorDiff;
-                        anomalyShiftAmount = deltaChange;
-                        anomalyNotified = false;
-                        alertDismissedForCurrentCycle = false;
-                    }
-
-                    if (anomalyActive) {
-                        // Check if the differential remains shifted relative to baseline
-                        const shiftFromBaseline = Math.abs(currentDiff - (anomalyBaselineDiff !== null ? anomalyBaselineDiff : currentDiff));
-                        if (deltaChange >= threshold) {
-                            anomalyShiftAmount = Math.max(anomalyShiftAmount, deltaChange);
+                    // Condition: difference in illuminance values > threshold in the text box
+                    // (Checked unless paused; still sends when not live / viewing past data)
+                    if (currentDiff > threshold) {
+                        const curTsLux = Date.now();
+                        if (!luxOverThresholdStart) {
+                            luxOverThresholdStart = curTsLux;
+                            luxStartTimeFormatted = timeLabel;
                         }
-                        const isPersisting = (shiftFromBaseline >= threshold * 0.75) || (deltaChange >= threshold);
 
-                        if (isPersisting) {
-                            const elapsedSec = Math.floor((Date.now() - anomalyStartTime) / 1000);
+                        if (curTsLux - lastLuxEmailDispatchedAt >= LUX_EMAIL_COOLDOWN_MS) {
+                            triggerEmailAlert(
+                                "Illuminance warning",
+                                `Illuminance difference is above ${threshold} Lux since ${luxStartTimeFormatted}`,
+                                `Δ ${currentDiff.toFixed(1)} Lux`,
+                                `> ${threshold} Lux`
+                            );
+                            lastLuxEmailDispatchedAt = curTsLux;
+                        }
 
-                            if (elapsedSec >= 10) {
-                                // Condition has persisted for 10 seconds: send notifications once
-                                if (!anomalyNotified && !alertDismissedForCurrentCycle) {
-                                    anomalyNotified = true;
-                                    currentAlertActive = true;
+                        // UI alerts (card highlight, pill, chime, desktop notification, banner)
+                        if (elCardLight) elCardLight.classList.add("is-abnormal");
+                        if (elLightAlertPill) {
+                            elLightAlertPill.style.display = "inline-flex";
+                            elLightAlertPill.className = "status-pill error";
+                            elLightAlertPill.textContent = `🚨 ABNORMAL (Δ ${currentDiff.toFixed(1)} Lux)`;
+                        }
 
-                                    // 1. Visual banner with auto-dismiss after 20 seconds
-                                    showAlertBanner(
-                                        "⚠️ SUSTAINED ABNORMAL LUX DELTA (>10s)",
-                                        `Sudden shift in differential lux (<strong>Δ ${anomalyShiftAmount.toFixed(1)} Lux</strong>) has persisted for <strong>${elapsedSec}s</strong> (Threshold: ${threshold} Lux).<br>Sensor 1: <strong>${lux1.toFixed(1)} Lux</strong>, Sensor 2: <strong>${lux2.toFixed(1)} Lux</strong> (Current diff: ${currentDiff.toFixed(1)} Lux at ${timeLabel}).`
-                                    );
+                        const nowTs = Date.now();
+                        if (!anomalyNotified || (nowTs - lastAlertTimestamp > 60000)) {
+                            anomalyNotified = true;
+                            lastAlertTimestamp = nowTs;
 
-                                    // 2. Acoustic chime & Desktop push notification
-                                    playAlertChime();
-                                    sendDesktopNotification(
-                                        "BioEdge • Abnormal Lux Delta Alert (10s)",
-                                        `Sensor difference shift of Δ ${anomalyShiftAmount.toFixed(1)} Lux has persisted for over 10 seconds! S1: ${lux1.toFixed(1)} Lux, S2: ${lux2.toFixed(1)} Lux.`
-                                    );
-                                }
+                            showAlertBanner(
+                                "⚠️ ILLUMINANCE DIFFERENCE WARNING",
+                                `Illuminance difference is above <strong>${threshold} Lux</strong> (Current: <strong>Δ ${currentDiff.toFixed(1)} Lux</strong> since ${luxStartTimeFormatted}).<br>Sensor 1: <strong>${lux1.toFixed(1)} Lux</strong>, Sensor 2: <strong>${lux2.toFixed(1)} Lux</strong>.`
+                            );
 
-                                // Active sustained highlight on card
-                                if (elCardLight) elCardLight.classList.add("is-abnormal");
-                                if (elLightAlertPill) {
-                                    elLightAlertPill.style.display = "inline-flex";
-                                    elLightAlertPill.className = "status-pill error";
-                                    elLightAlertPill.textContent = `🚨 ABNORMAL (Persisted ${elapsedSec}s)`;
-                                }
-                                if (elLightRateChange) {
-                                    elLightRateChange.textContent = `(shift: ${sign}${deltaChange.toFixed(1)} Lux | sustained ${elapsedSec}s)`;
-                                }
-                            } else {
-                                // Condition pending (< 10 seconds): show pending indicator without firing notifications
-                                if (elCardLight) elCardLight.classList.add("is-abnormal");
-                                if (elLightAlertPill) {
-                                    elLightAlertPill.style.display = "inline-flex";
-                                    elLightAlertPill.className = "status-pill paused";
-                                    elLightAlertPill.textContent = `⏳ SHIFT PENDING (${elapsedSec}s / 10s)`;
-                                }
-                                if (elLightRateChange) {
-                                    elLightRateChange.textContent = `(shift: ${sign}${deltaChange.toFixed(1)} Lux | persisting ${elapsedSec}s/10s)`;
-                                }
-                            }
-                        } else {
-                            // Abnormal condition cleared before reaching 10s or returned to baseline
-                            anomalyActive = false;
-                            anomalyStartTime = null;
-                            anomalyBaselineDiff = null;
-                            anomalyNotified = false;
-
-                            if (!currentAlertActive) {
-                                if (elCardLight) elCardLight.classList.remove("is-abnormal");
-                                if (elLightAlertPill) elLightAlertPill.style.display = "none";
-                                if (elLuxAlertBanner) elLuxAlertBanner.style.display = "none";
-                            }
+                            playAlertChime();
+                            sendDesktopNotification(
+                                "BioEdge • Illuminance Warning",
+                                `Illuminance difference is above ${threshold} Lux since ${luxStartTimeFormatted}! Current: Δ ${currentDiff.toFixed(1)} Lux.`
+                            );
                         }
                     } else {
-                        // Normal state: keep notification visible if 20s hold timer is active
+                        // Reset illuminance warning state when below threshold
+                        luxOverThresholdStart = null;
+                        luxStartTimeFormatted = null;
+                        anomalyNotified = false;
+
                         if (!currentAlertActive) {
                             if (elCardLight) elCardLight.classList.remove("is-abnormal");
                             if (elLightAlertPill) elLightAlertPill.style.display = "none";
@@ -2144,6 +2088,8 @@
 
                     prevSensorDiff = currentDiff;
                 } else {
+                    luxOverThresholdStart = null;
+                    luxStartTimeFormatted = null;
                     elLightDiff.textContent = "--";
                     if (elLightRateChange) elLightRateChange.textContent = "";
                     if (elCardLight) elCardLight.classList.remove("is-abnormal");
@@ -2622,7 +2568,7 @@
 
     elRefreshSelect.addEventListener("change", (e) => {
         pollIntervalMs = parseInt(e.target.value, 10);
-        if (!isPaused) setupPolling();
+        setupPolling();
     });
 
     elPauseBtn.addEventListener("click", () => {
@@ -2778,32 +2724,7 @@
         });
     }
 
-    // 5. Alert Email Input Listener & Persistence
-    const savedAlertEmail = localStorage.getItem("bioedge_alert_email") || "";
-    if (elAlertEmailInput) {
-        elAlertEmailInput.value = savedAlertEmail;
-        elAlertEmailInput.addEventListener("input", (e) => {
-            localStorage.setItem("bioedge_alert_email", e.target.value.trim());
-        });
-    }
 
-    // 6. Manual Email Test Button
-    if (elSendTestEmailBtn) {
-        elSendTestEmailBtn.addEventListener("click", () => {
-            const email = elAlertEmailInput ? elAlertEmailInput.value.trim() : "";
-            if (!email) {
-                alert("Please enter an email address in the box first.");
-                if (elAlertEmailInput) elAlertEmailInput.focus();
-                return;
-            }
-            triggerEmailAlert(
-                "Manual Test Verification",
-                "This is a test notification confirming that your BioEdge email alerts are configured properly.",
-                "Normal",
-                "Manual Test"
-            );
-        });
-    }
 
     // Initialize Audio & Notification UI states
     updateSoundBtnUI();

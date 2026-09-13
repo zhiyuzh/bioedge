@@ -169,6 +169,18 @@ def data():
     })
 
 
+def load_email_list():
+    email_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "email.list")
+    recipients = []
+    if os.path.exists(email_file):
+        with open(email_file, "r", encoding="utf-8") as f:
+            for line in f:
+                addr = line.strip()
+                if addr and not addr.startswith("#") and "@" in addr:
+                    recipients.append(addr)
+    return recipients
+
+
 # -------------------------------------------------
 # Email Alert Dispatcher API
 # -------------------------------------------------
@@ -177,22 +189,38 @@ def data():
 def send_email_alert():
     try:
         payload = request.get_json(force=True, silent=True) or {}
-        recipient = payload.get("email", "").strip()
-        alert_type = payload.get("type", "CPU Temperature Warning")
-        value = payload.get("value", "N/A")
-        threshold = payload.get("threshold", "> 50.0°C")
-        message = payload.get("message", "Raspberry Pi SoC Core Temperature has exceeded 50°C for longer than 10 consecutive seconds.")
+        recipients = payload.get("recipients") or []
+        if isinstance(recipients, str):
+            recipients = [r.strip() for r in recipients.splitlines() if r.strip()]
+        if not recipients and payload.get("email"):
+            recipients = [payload.get("email").strip()]
+        if not recipients:
+            recipients = load_email_list()
 
-        if not recipient:
-            return jsonify({"success": False, "error": "No recipient email address provided"}), 400
+        alert_type = payload.get("type", "CPU temperature warning")
+        detail_msg = payload.get("message", "").strip()
+
+        # Subject: (Error Type)
+        # Body: Warning: (Illuminance warning or CPU temperature warning)
+        # <detail line>
+        subject = alert_type
+        if detail_msg:
+            body = f"Warning: {alert_type}\n{detail_msg}"
+        else:
+            body = f"Warning: {alert_type}"
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        send_to_formatted = "\n".join(recipients)
+
+        # Log to disk with exact Subject, Send to (separated by lines), and Body
         log_entry = (
-            f"[{timestamp}] ALERT EMAIL TO <{recipient}> | "
-            f"Type: {alert_type} | Val: {value} | Thresh: {threshold} | {message}\n"
+            f"[{timestamp}] ALERT EMAIL DISPATCH\n"
+            f"Subject: {subject}\n"
+            f"Send to:\n{send_to_formatted}\n"
+            f"Body:\n{body}\n"
+            f"{'='*60}\n"
         )
 
-        # Log to disk so notifications are always auditable
         log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_emails.log")
         try:
             with open(log_file, "a", encoding="utf-8") as f:
@@ -200,78 +228,57 @@ def send_email_alert():
         except Exception as log_err:
             print(f"[BioEdge Email Log Error]: {log_err}")
 
-        # Attempt SMTP delivery if configured or available
-        smtp_host = os.environ.get("SMTP_HOST")
+        # Send via Gmail SMTP if credentials configured
+        smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+        smtp_port = int(os.environ.get("SMTP_PORT", 587))
+        smtp_user = os.environ.get("SMTP_USER") or os.environ.get("GMAIL_USER")
+        smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASS")
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user or "bioedge-alert@gmail.com")
+
         email_sent = False
         delivery_note = f"Logged to {os.path.basename(log_file)}"
 
-        if smtp_host:
+        if smtp_user and smtp_pass and recipients:
             try:
-                smtp_port = int(os.environ.get("SMTP_PORT", 587))
-                smtp_user = os.environ.get("SMTP_USER")
-                smtp_pass = os.environ.get("SMTP_PASS")
-                smtp_from = os.environ.get("SMTP_FROM", smtp_user or "bioedge-alert@localhost")
-
                 msg = MIMEMultipart()
                 msg["From"] = smtp_from
-                msg["To"] = recipient
-                msg["Subject"] = f"BioEdge Critical Alert: {alert_type} (>10s)"
-                body = (
-                    f"BioEdge Telemetry Alert\n"
-                    f"====================================\n"
-                    f"Timestamp: {timestamp}\n"
-                    f"Alert Type: {alert_type}\n"
-                    f"Measured Value: {value}\n"
-                    f"Threshold: {threshold}\n"
-                    f"Duration: Sustained for > 10 consecutive seconds\n\n"
-                    f"Details:\n{message}\n"
-                    f"------------------------------------\n"
-                    f"Sent automatically by BioEdge System on Raspberry Pi.\n"
-                )
+                msg["To"] = ", ".join(recipients)
+                msg["Subject"] = subject
                 msg.attach(MIMEText(body, "plain"))
 
-                server = smtplib.SMTP(smtp_host, smtp_port, timeout=3)
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=5)
                 if smtp_port == 587:
                     server.starttls()
-                if smtp_user and smtp_pass:
-                    server.login(smtp_user, smtp_pass)
-                server.sendmail(smtp_from, recipient, msg.as_string())
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_from, recipients, msg.as_string())
                 server.quit()
                 email_sent = True
-                delivery_note = f"Delivered via SMTP relay ({smtp_host})"
+                delivery_note = f"Delivered via Gmail SMTP ({smtp_host}) to {len(recipients)} recipients"
             except Exception as e:
-                delivery_note = f"SMTP error: {e} (logged to {os.path.basename(log_file)})"
+                delivery_note = f"Gmail SMTP error: {e} (logged to {os.path.basename(log_file)})"
                 print(f"[BioEdge SMTP Error]: {e}")
-        else:
-            # Check local SMTP on port 25
+        elif recipients:
+            # Attempt local SMTP on port 25 as fallback
             try:
                 msg = MIMEMultipart()
                 msg["From"] = "bioedge-alert@localhost"
-                msg["To"] = recipient
-                msg["Subject"] = f"BioEdge Critical Alert: {alert_type} (>10s)"
-                body = (
-                    f"BioEdge Telemetry Alert\n"
-                    f"====================================\n"
-                    f"Timestamp: {timestamp}\n"
-                    f"Alert Type: {alert_type}\n"
-                    f"Measured Value: {value}\n"
-                    f"Threshold: {threshold}\n"
-                    f"Duration: Sustained for > 10 consecutive seconds\n\n"
-                    f"Details:\n{message}\n"
-                )
+                msg["To"] = ", ".join(recipients)
+                msg["Subject"] = subject
                 msg.attach(MIMEText(body, "plain"))
+
                 server = smtplib.SMTP("localhost", 25, timeout=2)
-                server.sendmail("bioedge-alert@localhost", recipient, msg.as_string())
+                server.sendmail("bioedge-alert@localhost", recipients, msg.as_string())
                 server.quit()
                 email_sent = True
-                delivery_note = "Delivered via local mail agent"
+                delivery_note = f"Delivered via local mail agent to {len(recipients)} recipients"
             except Exception:
-                delivery_note = "Logged to server disk (alert_emails.log)"
+                delivery_note = f"Logged to server disk ({os.path.basename(log_file)}) - Gmail credentials not configured"
 
         return jsonify({
             "success": True,
             "email_sent": email_sent,
-            "recipient": recipient,
+            "subject": subject,
+            "recipients": recipients,
             "timestamp": timestamp,
             "note": delivery_note
         })
