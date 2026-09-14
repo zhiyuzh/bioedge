@@ -11,6 +11,23 @@ from email.mime.multipart import MIMEMultipart
 
 from flask import Flask, render_template, jsonify, request
 
+def load_env_file():
+    env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        os.environ[k] = v
+        except Exception:
+            pass
+
+load_env_file()
+
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
@@ -151,7 +168,8 @@ def load_thresholds():
 
     defaults = {
         "illuminance_threshold": 50.0,
-        "temperature_threshold": 55.0
+        "temperature_threshold": 55.0,
+        "temperature_persistence_seconds": 10
     }
 
     if not os.path.exists(config_file):
@@ -186,6 +204,17 @@ def load_thresholds():
                     thresholds["temperature_threshold"] = float(cfg["temperature"].get("threshold", cfg["temperature"].get("cpu_threshold", 55.0)))
                 else:
                     thresholds["temperature_threshold"] = float(cfg["temperature"])
+
+            if "temperature_persistence_seconds" in cfg:
+                thresholds["temperature_persistence_seconds"] = int(cfg["temperature_persistence_seconds"])
+            elif "persistence_seconds" in cfg:
+                thresholds["temperature_persistence_seconds"] = int(cfg["persistence_seconds"])
+            elif "persistent_seconds" in cfg:
+                thresholds["temperature_persistence_seconds"] = int(cfg["persistent_seconds"])
+            elif "temperature_persistence" in cfg:
+                thresholds["temperature_persistence_seconds"] = int(cfg["temperature_persistence"])
+            elif "persistent_time" in cfg:
+                thresholds["temperature_persistence_seconds"] = int(cfg["persistent_time"])
 
         _thresholds_cache = thresholds
         _thresholds_mtime = mtime
@@ -283,31 +312,41 @@ def send_email_alert():
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         send_to_formatted = "\n".join(recipients)
 
-        # Log to disk with exact Subject, Send to (separated by lines), and Body
-        log_entry = (
-            f"[{timestamp}] ALERT EMAIL DISPATCH\n"
-            f"Subject: {subject}\n"
-            f"Send to:\n{send_to_formatted}\n"
-            f"Body:\n{body}\n"
-            f"{'='*60}\n"
-        )
-
-        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_emails.log")
-        try:
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(log_entry)
-        except Exception as log_err:
-            print(f"[BioEdge Email Log Error]: {log_err}")
-
-        # Send via Gmail SMTP if credentials configured
-        smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+        # 1. Reload .env and check environment variables for SMTP credentials
+        load_env_file()
+        smtp_host = os.environ.get("SMTP_HOST")
         smtp_port = int(os.environ.get("SMTP_PORT", 587))
         smtp_user = os.environ.get("SMTP_USER") or os.environ.get("GMAIL_USER")
         smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASS")
-        smtp_from = os.environ.get("SMTP_FROM", smtp_user or "bioedge-alert@gmail.com")
+        smtp_from = os.environ.get("SMTP_FROM")
+
+        # 2. Check thresholds.yaml for optional SMTP credentials if not in environment
+        if not (smtp_user and smtp_pass):
+            config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "thresholds.yaml")
+            if os.path.exists(config_file):
+                try:
+                    with open(config_file, "r", encoding="utf-8") as f:
+                        cfg = yaml.safe_load(f) or {}
+                    if isinstance(cfg, dict):
+                        smtp_cfg = cfg.get("smtp") or cfg.get("email") or {}
+                        if isinstance(smtp_cfg, dict):
+                            smtp_user = smtp_user or smtp_cfg.get("user") or smtp_cfg.get("username") or smtp_cfg.get("smtp_user")
+                            smtp_pass = smtp_pass or smtp_cfg.get("pass") or smtp_cfg.get("password") or smtp_cfg.get("smtp_pass")
+                            smtp_host = smtp_host or smtp_cfg.get("host")
+                            if "port" in smtp_cfg:
+                                smtp_port = int(smtp_cfg["port"])
+                            smtp_from = smtp_from or smtp_cfg.get("from")
+                        else:
+                            smtp_user = smtp_user or cfg.get("smtp_user") or cfg.get("gmail_user")
+                            smtp_pass = smtp_pass or cfg.get("smtp_pass") or cfg.get("gmail_app_pass")
+                except Exception:
+                    pass
+
+        smtp_host = smtp_host or "smtp.gmail.com"
+        smtp_from = smtp_from or (smtp_user or "bioedge-alert@gmail.com")
 
         email_sent = False
-        delivery_note = f"Logged to {os.path.basename(log_file)}"
+        delivery_status = "NOT DELIVERED (No SMTP credentials configured - logged to disk only)"
 
         if smtp_user and smtp_pass and recipients:
             try:
@@ -317,16 +356,16 @@ def send_email_alert():
                 msg["Subject"] = subject
                 msg.attach(MIMEText(body, "plain"))
 
-                server = smtplib.SMTP(smtp_host, smtp_port, timeout=5)
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=8)
                 if smtp_port == 587:
                     server.starttls()
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_from, recipients, msg.as_string())
                 server.quit()
                 email_sent = True
-                delivery_note = f"Delivered via Gmail SMTP ({smtp_host}) to {len(recipients)} recipients"
+                delivery_status = f"DELIVERED via SMTP ({smtp_host}) to {len(recipients)} recipients"
             except Exception as e:
-                delivery_note = f"Gmail SMTP error: {e} (logged to {os.path.basename(log_file)})"
+                delivery_status = f"FAILED: SMTP Error ({e})"
                 print(f"[BioEdge SMTP Error]: {e}")
         elif recipients:
             # Attempt local SMTP on port 25 as fallback
@@ -341,17 +380,35 @@ def send_email_alert():
                 server.sendmail("bioedge-alert@localhost", recipients, msg.as_string())
                 server.quit()
                 email_sent = True
-                delivery_note = f"Delivered via local mail agent to {len(recipients)} recipients"
+                delivery_status = f"DELIVERED via local mail agent to {len(recipients)} recipients"
             except Exception:
-                delivery_note = f"Logged to server disk ({os.path.basename(log_file)}) - Gmail credentials not configured"
+                delivery_status = "NOT DELIVERED (No SMTP credentials configured; local port 25 closed - logged to disk only)"
+
+        # Log to disk with exact Subject, Status, Send to, and Body
+        log_entry = (
+            f"[{timestamp}] ALERT EMAIL DISPATCH\n"
+            f"Status: {delivery_status}\n"
+            f"Subject: {subject}\n"
+            f"Send to:\n{send_to_formatted}\n"
+            f"Body:\n{body}\n"
+            f"{'='*60}\n"
+        )
+
+        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_emails.log")
+        try:
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+        except Exception as log_err:
+            print(f"[BioEdge Email Log Error]: {log_err}")
 
         return jsonify({
             "success": True,
             "email_sent": email_sent,
+            "status": delivery_status,
             "subject": subject,
             "recipients": recipients,
             "timestamp": timestamp,
-            "note": delivery_note
+            "note": delivery_status
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

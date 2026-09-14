@@ -1395,9 +1395,16 @@
                     <span>Thermal Status:</span>
                     <span id="pi_status_label" class="metric-secondary-val" style="color: var(--accent-emerald); margin-left: 4px;">Optimal</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Threshold:</span>
-                    <span id="pi_threshold_val" class="metric-secondary-val" style="color: var(--accent-cyan); font-family: monospace;">>{{ thresholds.temperature_threshold if thresholds else 55.0 }}°C</span>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Threshold:</span>
+                        <span id="pi_threshold_val" class="metric-secondary-val" style="color: var(--accent-cyan); font-family: monospace;">>{{ thresholds.temperature_threshold if thresholds else 55.0 }}°C</span>
+                    </div>
+                    <span style="color: var(--text-secondary); opacity: 0.4; font-size: 0.75rem;">|</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Persist:</span>
+                        <span id="pi_persist_val" class="metric-secondary-val" style="color: var(--accent-cyan); font-family: monospace;">>{{ thresholds.temperature_persistence_seconds if (thresholds and thresholds.temperature_persistence_seconds is defined) else 10 }}s</span>
+                    </div>
                 </div>
             </div>
 
@@ -1522,6 +1529,7 @@
     const elPiStatus = document.getElementById("pi_status_label");
     const elPiAlertPill = document.getElementById("pi_alert_pill");
     const elPiThresholdVal = document.getElementById("pi_threshold_val");
+    const elPiPersistVal = document.getElementById("pi_persist_val");
 
 
     const elTemp = document.getElementById("temperature");
@@ -1584,6 +1592,7 @@
     // Operating Alert Thresholds loaded from thresholds.yaml (via backend /data)
     let configIlluminanceThreshold = {{ thresholds.illuminance_threshold if thresholds else 50.0 }};
     let configTemperatureThreshold = {{ thresholds.temperature_threshold if thresholds else 55.0 }};
+    let configTemperaturePersistence = {{ thresholds.temperature_persistence_seconds if (thresholds and thresholds.temperature_persistence_seconds is defined) else 10 }};
 
     // CPU Temperature Threshold Tracking
     let lastCpuAlertTime = 0;
@@ -1815,6 +1824,12 @@
                             elPiThresholdVal.textContent = `>${configTemperatureThreshold.toFixed(1)}°C`;
                         }
                     }
+                    if (data.thresholds.temperature_persistence_seconds !== undefined) {
+                        configTemperaturePersistence = Number(data.thresholds.temperature_persistence_seconds);
+                        if (elPiPersistVal) {
+                            elPiPersistVal.textContent = `>${configTemperaturePersistence}s`;
+                        }
+                    }
                 }
 
                 const now = new Date();
@@ -1834,23 +1849,7 @@
                     elPiMeter.style.width = piPct + "%";
 
                     if (piNum > configTemperatureThreshold) {
-                        // CPU Overheating (> threshold): Critical warning and alerts
-                        if (elCardPi) {
-                            elCardPi.classList.remove("is-pending");
-                            elCardPi.classList.add("is-overheating");
-                        }
-                        if (elPiAlertPill) {
-                            elPiAlertPill.style.display = "inline-flex";
-                            elPiAlertPill.className = "status-pill error";
-                            elPiAlertPill.textContent = `🚨 OVERHEAT (${piNum.toFixed(1)}°C)`;
-                        }
-                        elPiStatus.textContent = `OVERHEATING (>${configTemperatureThreshold.toFixed(0)}°C)`;
-                        elPiStatus.style.color = "var(--accent-rose)";
-                        elPiMeter.style.background = "var(--accent-rose)";
-
-                        // 10s Continuous Overheat Tracking for Email Alert:
-                        // If <persist> 10 seconds: Send email after 5 minutes
-                        // Else: Reset timer
+                        // Continuous Overheat Tracking:
                         const curTsCpu = Date.now();
                         if (!cpuOverThresholdStart) {
                             cpuOverThresholdStart = curTsCpu;
@@ -1858,32 +1857,67 @@
                         }
                         const elapsedSec = Math.floor((curTsCpu - cpuOverThresholdStart) / 1000);
 
-                        if (elapsedSec >= 10 && (curTsCpu - lastCpuEmailDispatchedAt >= CPU_EMAIL_COOLDOWN_MS)) {
-                            triggerEmailAlert(
-                                "CPU temperature warning",
-                                `Over heat ${piNum.toFixed(1)}°C for ${elapsedSec}s since ${cpuStartTimeFormatted}`,
-                                `${piNum.toFixed(1)}°C`,
-                                `> ${configTemperatureThreshold.toFixed(1)}°C`
-                            );
-                            lastCpuEmailDispatchedAt = curTsCpu;
-                        }
+                        if (elapsedSec > configTemperaturePersistence) {
+                            // Critical Overheat: Temp > threshold AND persisted > configTemperaturePersistence
+                            if (elCardPi) {
+                                elCardPi.classList.remove("is-pending");
+                                elCardPi.classList.add("is-overheating");
+                            }
+                            if (elPiAlertPill) {
+                                elPiAlertPill.style.display = "inline-flex";
+                                elPiAlertPill.className = "status-pill error";
+                                elPiAlertPill.textContent = `🚨 OVERHEAT (${piNum.toFixed(1)}°C)`;
+                            }
+                            elPiStatus.textContent = `OVERHEATING (>${configTemperatureThreshold.toFixed(0)}°C)`;
+                            elPiStatus.style.color = "var(--accent-rose)";
+                            elPiMeter.style.background = "var(--accent-rose)";
 
-                        const nowTs = Date.now();
-                        if (!cpuAlertActive || (nowTs - lastCpuAlertTime > 60000)) {
-                            cpuAlertActive = true;
-                            lastCpuAlertTime = nowTs;
+                            // Email Alert (with 5-minute cooldown)
+                            if (curTsCpu - lastCpuEmailDispatchedAt >= CPU_EMAIL_COOLDOWN_MS) {
+                                triggerEmailAlert(
+                                    "CPU temperature warning",
+                                    `Over heat ${piNum.toFixed(1)}°C for ${elapsedSec}s since ${cpuStartTimeFormatted}`,
+                                    `${piNum.toFixed(1)}°C`,
+                                    `> ${configTemperatureThreshold.toFixed(1)}°C (>${configTemperaturePersistence}s)`
+                                );
+                                lastCpuEmailDispatchedAt = curTsCpu;
+                            }
 
-                            playAlertChime();
+                            // Banner & Chime Alert
+                            const nowTs = Date.now();
+                            if (!cpuAlertActive || (nowTs - lastCpuAlertTime > 60000)) {
+                                cpuAlertActive = true;
+                                lastCpuAlertTime = nowTs;
 
-                            showAlertBanner(
-                                `⚠️ CPU OVERHEAT WARNING (>${configTemperatureThreshold.toFixed(0)}°C)`,
-                                `Raspberry Pi SoC Core Temperature has exceeded safe limit: <strong>${piNum.toFixed(1)}°C</strong> (Threshold: >${configTemperatureThreshold.toFixed(1)}°C). Check cooling or reduce workload.`
-                            );
+                                playAlertChime();
+
+                                showAlertBanner(
+                                    `⚠️ CPU OVERHEAT WARNING (>${configTemperatureThreshold.toFixed(0)}°C)`,
+                                    `Raspberry Pi SoC Core Temperature has exceeded safe limit persistently for <strong>${elapsedSec}s</strong>: <strong>${piNum.toFixed(1)}°C</strong> (Threshold: >${configTemperatureThreshold.toFixed(1)}°C for >${configTemperaturePersistence}s). Check cooling or reduce workload.`
+                                );
+                            }
+                        } else {
+                            // Temperature is above threshold, but has NOT yet persisted for > configTemperaturePersistence
+                            // Pending overheat confirmation state
+                            if (elCardPi) {
+                                elCardPi.classList.remove("is-overheating");
+                                elCardPi.classList.add("is-pending");
+                            }
+                            if (elPiAlertPill) {
+                                elPiAlertPill.style.display = "inline-flex";
+                                elPiAlertPill.className = "status-pill paused";
+                                elPiAlertPill.textContent = `⏳ OVERHEAT PENDING (${elapsedSec}s / ${configTemperaturePersistence}s)`;
+                            }
+                            elPiStatus.textContent = `High Temp (${elapsedSec}s / ${configTemperaturePersistence}s)`;
+                            elPiStatus.style.color = "var(--accent-amber)";
+                            elPiMeter.style.background = "var(--accent-amber)";
+                            cpuAlertActive = false;
                         }
                     } else if (piNum >= Math.max(45.0, configTemperatureThreshold - 10.0)) {
-                        // Pending Warning: Visual warning state, reset 10s overheat timer
+                        // Pending Warning: Approaching threshold, reset overheat timer
                         cpuOverThresholdStart = null;
                         cpuStartTimeFormatted = null;
+                        cpuAlertActive = false;
                         if (elCardPi) {
                             elCardPi.classList.remove("is-overheating");
                             elCardPi.classList.add("is-pending");
@@ -1897,11 +1931,11 @@
                         elPiStatus.textContent = `Pending Warning (≥${pendingThreshold.toFixed(0)}°C)`;
                         elPiStatus.style.color = "var(--accent-amber)";
                         elPiMeter.style.background = "var(--accent-amber)";
-                        cpuAlertActive = false;
                     } else {
                         // Optimal (< 45°C): Normal state, reset timer
                         cpuOverThresholdStart = null;
                         cpuStartTimeFormatted = null;
+                        cpuAlertActive = false;
                         if (elCardPi) {
                             elCardPi.classList.remove("is-overheating");
                             elCardPi.classList.remove("is-pending");
@@ -1912,11 +1946,11 @@
                         elPiStatus.textContent = "Optimal";
                         elPiStatus.style.color = "var(--accent-emerald)";
                         elPiMeter.style.background = "linear-gradient(90deg, #06b6d4, #3b82f6)";
-                        cpuAlertActive = false;
                     }
                 } else {
                     cpuOverThresholdStart = null;
                     cpuStartTimeFormatted = null;
+                    cpuAlertActive = false;
                     if (elCardPi) {
                         elCardPi.classList.remove("is-overheating");
                         elCardPi.classList.remove("is-pending");
