@@ -168,6 +168,7 @@ def load_thresholds():
 
     defaults = {
         "illuminance_threshold": 50.0,
+        "illuminance_persistence_seconds": 10,
         "temperature_threshold": 55.0,
         "temperature_persistence_seconds": 10
     }
@@ -194,6 +195,13 @@ def load_thresholds():
                     thresholds["illuminance_threshold"] = float(cfg["illuminance"].get("threshold", cfg["illuminance"].get("difference_threshold", 50.0)))
                 else:
                     thresholds["illuminance_threshold"] = float(cfg["illuminance"])
+
+            if "illuminance_persistence_seconds" in cfg:
+                thresholds["illuminance_persistence_seconds"] = int(cfg["illuminance_persistence_seconds"])
+            elif "illuminance_persistence" in cfg:
+                thresholds["illuminance_persistence_seconds"] = int(cfg["illuminance_persistence"])
+            elif "lux_persistence_seconds" in cfg:
+                thresholds["illuminance_persistence_seconds"] = int(cfg["lux_persistence_seconds"])
 
             if "temperature_threshold" in cfg:
                 thresholds["temperature_threshold"] = float(cfg["temperature_threshold"])
@@ -225,13 +233,27 @@ def load_thresholds():
 
 
 # -------------------------------------------------
+# Global Stream State (Synchronized across all clients)
+# -------------------------------------------------
+
+_stream_state = {
+    "paused": False,
+    "paused_at": None
+}
+
+
+# -------------------------------------------------
 # Flask webpage
 # -------------------------------------------------
 
 @app.route("/")
 def home():
     thresholds = load_thresholds()
-    return render_template("index.html", thresholds=thresholds)
+    return render_template(
+        "index.html",
+        thresholds=thresholds,
+        is_stream_paused=_stream_state["paused"]
+    )
 
 
 # -------------------------------------------------
@@ -260,13 +282,40 @@ def data():
         "pressure_mmhg": round(pressure * 0.750062, 2) if pressure is not None else None,
         "light_1_lux": round(lux1, 2) if lux1 is not None else None,
         "light_2_lux": round(lux2, 2) if lux2 is not None else None,
-        "thresholds": thresholds
+        "thresholds": thresholds,
+        "is_stream_paused": _stream_state["paused"]
     })
 
 
 @app.route("/api/thresholds")
 def get_thresholds():
     return jsonify(load_thresholds())
+
+
+# -------------------------------------------------
+# Global Stream Control API
+# -------------------------------------------------
+
+@app.route("/api/stream/control", methods=["GET", "POST"])
+def stream_control():
+    global _stream_state
+    if request.method == "POST":
+        payload = request.get_json(force=True, silent=True) or {}
+        if "paused" in payload:
+            _stream_state["paused"] = bool(payload["paused"])
+        else:
+            _stream_state["paused"] = not _stream_state["paused"]
+
+        if _stream_state["paused"]:
+            _stream_state["paused_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            _stream_state["paused_at"] = None
+
+    return jsonify({
+        "success": True,
+        "paused": _stream_state["paused"],
+        "paused_at": _stream_state["paused_at"]
+    })
 
 
 def load_email_list():
@@ -311,6 +360,33 @@ def send_email_alert():
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         send_to_formatted = "\n".join(recipients)
+
+        # Server-side guard: block Illuminance alerts if stream is globally paused
+        if _stream_state["paused"] and "Illuminance" in alert_type:
+            delivery_status = "SUPPRESSED (Stream is globally paused by user)"
+            log_entry = (
+                f"[{timestamp}] ALERT EMAIL DISPATCH\n"
+                f"Status: {delivery_status}\n"
+                f"Subject: {subject}\n"
+                f"Send to:\n{send_to_formatted}\n"
+                f"Body:\n{body}\n"
+                f"{'='*60}\n"
+            )
+            log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_emails.log")
+            try:
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(log_entry)
+            except Exception as log_err:
+                print(f"[BioEdge Email Log Error]: {log_err}")
+            return jsonify({
+                "success": True,
+                "email_sent": False,
+                "status": delivery_status,
+                "subject": subject,
+                "recipients": recipients,
+                "timestamp": timestamp,
+                "note": delivery_status
+            })
 
         # 1. Reload .env and check environment variables for SMTP credentials
         load_env_file()

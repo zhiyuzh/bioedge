@@ -1348,9 +1348,16 @@
                     <span id="light_diff" class="metric-secondary-val">--</span>
                     <span id="light_rate_change" style="font-size: 0.74rem; color: var(--text-muted); margin-left: 6px; font-family: monospace;"></span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Δ Threshold:</span>
-                    <span id="lux_threshold_val" class="metric-secondary-val" style="color: var(--accent-amber); font-family: monospace;">{{ thresholds.illuminance_threshold if thresholds else 50.0 }} Lux</span>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Δ Threshold:</span>
+                        <span id="lux_threshold_val" class="metric-secondary-val" style="color: var(--accent-amber); font-family: monospace;">{{ thresholds.illuminance_threshold if thresholds else 5000.0 }} Lux</span>
+                    </div>
+                    <span style="color: var(--text-secondary); opacity: 0.4; font-size: 0.75rem;">|</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Persist:</span>
+                        <span id="lux_persist_val" class="metric-secondary-val" style="color: var(--accent-amber); font-family: monospace;">>{{ thresholds.illuminance_persistence_seconds if (thresholds and thresholds.illuminance_persistence_seconds is defined) else 10 }}s</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1502,7 +1509,7 @@
     let activeChartMode = 'temp'; // 'temp' | 'pressure' | 'light'
     let pollIntervalMs = 1000;
     let timerId = null;
-    let isPaused = false;
+    let isPaused = {{ "true" if is_stream_paused else "false" }};
     let consecutiveFailures = 0;
 
     // Time Scrubbing & Dragging State
@@ -1565,6 +1572,7 @@
     const elLightRateChange = document.getElementById("light_rate_change");
     const elLightAlertPill = document.getElementById("light_alert_pill");
     const elLuxThresholdVal = document.getElementById("lux_threshold_val");
+    const elLuxPersistVal = document.getElementById("lux_persist_val");
     const elLuxAlertBanner = document.getElementById("lux_alert_banner");
     const elLuxAlertMsg = document.getElementById("lux_alert_msg");
     const elAlertDismissBtn = document.getElementById("alert_dismiss_btn");
@@ -1590,7 +1598,8 @@
     let anomalyShiftAmount = 0;
 
     // Operating Alert Thresholds loaded from thresholds.yaml (via backend /data)
-    let configIlluminanceThreshold = {{ thresholds.illuminance_threshold if thresholds else 50.0 }};
+    let configIlluminanceThreshold = {{ thresholds.illuminance_threshold if thresholds else 5000.0 }};
+    let configIlluminancePersistence = {{ thresholds.illuminance_persistence_seconds if (thresholds and thresholds.illuminance_persistence_seconds is defined) else 10 }};
     let configTemperatureThreshold = {{ thresholds.temperature_threshold if thresholds else 55.0 }};
     let configTemperaturePersistence = {{ thresholds.temperature_persistence_seconds if (thresholds and thresholds.temperature_persistence_seconds is defined) else 10 }};
 
@@ -1804,10 +1813,19 @@
             })
             .then(data => {
                 consecutiveFailures = 0;
+
+                // Synchronize global pause state from backend across all users
+                if (data.is_stream_paused !== undefined) {
+                    const globalPaused = Boolean(data.is_stream_paused);
+                    if (isPaused !== globalPaused) {
+                        applyPauseState(globalPaused);
+                    }
+                }
+
                 if (!isPaused) {
                     setConnectionStatus('online', 'LIVE STREAMING');
                 } else {
-                    setConnectionStatus('paused', 'STREAM PAUSED');
+                    setConnectionStatus('paused', 'STREAM PAUSED (GLOBAL)');
                 }
 
                 // Update dynamic thresholds from YAML config
@@ -1816,6 +1834,12 @@
                         configIlluminanceThreshold = Number(data.thresholds.illuminance_threshold);
                         if (elLuxThresholdVal) {
                             elLuxThresholdVal.textContent = `${configIlluminanceThreshold.toFixed(1)} Lux`;
+                        }
+                    }
+                    if (data.thresholds.illuminance_persistence_seconds !== undefined) {
+                        configIlluminancePersistence = Number(data.thresholds.illuminance_persistence_seconds);
+                        if (elLuxPersistVal) {
+                            elLuxPersistVal.textContent = `>${configIlluminancePersistence}s`;
                         }
                     }
                     if (data.thresholds.temperature_threshold !== undefined) {
@@ -1960,8 +1984,12 @@
                     elPiTempUnit.style.display = "none";
                 }
 
-                // If paused, skip telemetry history appending, chart re-renders, and illuminance alerts
+                // If paused by user, suppress illuminance alerts and skip history/chart updates
                 if (isPaused) {
+                    luxOverThresholdStart = null;
+                    luxStartTimeFormatted = null;
+                    anomalyNotified = false;
+                    hideLuxAlert();
                     return;
                 }
 
@@ -2035,44 +2063,58 @@
 
                     const threshold = configIlluminanceThreshold;
 
-                    // Condition: difference in illuminance values > threshold defined in YAML
-                    // (Checked unless paused; still sends when not live / viewing past data)
-                    if (currentDiff > threshold) {
+                    // Condition: difference in illuminance values > threshold defined in YAML persistent for > configIlluminancePersistence
+                    // (Strictly suppressed if stream is paused by user)
+                    if (!isPaused && currentDiff > threshold) {
                         const curTsLux = Date.now();
                         if (!luxOverThresholdStart) {
                             luxOverThresholdStart = curTsLux;
                             luxStartTimeFormatted = timeLabel;
                         }
+                        const elapsedSec = Math.floor((curTsLux - luxOverThresholdStart) / 1000);
 
-                        if (curTsLux - lastLuxEmailDispatchedAt >= LUX_EMAIL_COOLDOWN_MS) {
-                            triggerEmailAlert(
-                                "Illuminance warning",
-                                `Illuminance difference is above ${threshold} Lux since ${luxStartTimeFormatted}`,
-                                `Δ ${currentDiff.toFixed(1)} Lux`,
-                                `> ${threshold} Lux`
-                            );
-                            lastLuxEmailDispatchedAt = curTsLux;
-                        }
+                        if (elapsedSec > configIlluminancePersistence) {
+                            // Abnormal Illuminance: delta > threshold AND sustained > configIlluminancePersistence
+                            if (curTsLux - lastLuxEmailDispatchedAt >= LUX_EMAIL_COOLDOWN_MS) {
+                                triggerEmailAlert(
+                                    "Illuminance warning",
+                                    `Illuminance difference is above ${threshold} Lux for ${elapsedSec}s since ${luxStartTimeFormatted}`,
+                                    `Δ ${currentDiff.toFixed(1)} Lux`,
+                                    `> ${threshold} Lux (>${configIlluminancePersistence}s)`
+                                );
+                                lastLuxEmailDispatchedAt = curTsLux;
+                            }
 
-                        // UI alerts (card highlight, pill, chime, banner)
-                        if (elCardLight) elCardLight.classList.add("is-abnormal");
-                        if (elLightAlertPill) {
-                            elLightAlertPill.style.display = "inline-flex";
-                            elLightAlertPill.className = "status-pill error";
-                            elLightAlertPill.textContent = `🚨 ABNORMAL (Δ ${currentDiff.toFixed(1)} Lux)`;
-                        }
+                            // UI alerts (card highlight, pill, chime, banner)
+                            if (elCardLight) elCardLight.classList.add("is-abnormal");
+                            if (elLightAlertPill) {
+                                elLightAlertPill.style.display = "inline-flex";
+                                elLightAlertPill.className = "status-pill error";
+                                elLightAlertPill.textContent = `🚨 ABNORMAL (Δ ${currentDiff.toFixed(1)} Lux)`;
+                            }
 
-                        const nowTs = Date.now();
-                        if (!anomalyNotified || (nowTs - lastAlertTimestamp > 60000)) {
-                            anomalyNotified = true;
-                            lastAlertTimestamp = nowTs;
+                            const nowTs = Date.now();
+                            if (!anomalyNotified || (nowTs - lastAlertTimestamp > 60000)) {
+                                anomalyNotified = true;
+                                lastAlertTimestamp = nowTs;
 
-                            showAlertBanner(
-                                "⚠️ ILLUMINANCE DIFFERENCE WARNING",
-                                `Illuminance difference is above <strong>${threshold} Lux</strong> (Current: <strong>Δ ${currentDiff.toFixed(1)} Lux</strong> since ${luxStartTimeFormatted}).<br>Sensor 1: <strong>${lux1.toFixed(1)} Lux</strong>, Sensor 2: <strong>${lux2.toFixed(1)} Lux</strong>.`
-                            );
+                                showAlertBanner(
+                                    "⚠️ ILLUMINANCE DIFFERENCE WARNING",
+                                    `Illuminance difference has persisted above <strong>${threshold} Lux</strong> for <strong>${elapsedSec}s</strong> (Current: <strong>Δ ${currentDiff.toFixed(1)} Lux</strong> since ${luxStartTimeFormatted}).<br>Sensor 1: <strong>${lux1.toFixed(1)} Lux</strong>, Sensor 2: <strong>${lux2.toFixed(1)} Lux</strong>.`
+                                );
 
-                            playAlertChime();
+                                playAlertChime();
+                            }
+                        } else {
+                            // Delta is above threshold, but has NOT yet persisted > configIlluminancePersistence
+                            // Show pending confirmation status pill
+                            if (elCardLight) elCardLight.classList.remove("is-abnormal");
+                            if (elLightAlertPill) {
+                                elLightAlertPill.style.display = "inline-flex";
+                                elLightAlertPill.className = "status-pill paused";
+                                elLightAlertPill.textContent = `⏳ LUX PENDING (${elapsedSec}s / ${configIlluminancePersistence}s)`;
+                            }
+                            anomalyNotified = false;
                         }
                     } else {
                         // Reset illuminance warning state when below threshold
@@ -2572,16 +2614,47 @@
         setupPolling();
     });
 
-    elPauseBtn.addEventListener("click", () => {
-        isPaused = !isPaused;
+    function applyPauseState(paused) {
+        isPaused = Boolean(paused);
         if (isPaused) {
-            setConnectionStatus('paused', 'STREAM PAUSED');
+            setConnectionStatus('paused', 'STREAM PAUSED (GLOBAL)');
             elPauseText.textContent = "Resume";
             elPauseBtn.style.borderColor = "var(--accent-amber)";
+            luxOverThresholdStart = null;
+            luxStartTimeFormatted = null;
+            anomalyNotified = false;
+            hideLuxAlert();
         } else {
             setConnectionStatus('online', 'LIVE STREAMING');
             elPauseText.textContent = "Pause";
             elPauseBtn.style.borderColor = "";
+        }
+    }
+
+    if (isPaused) {
+        applyPauseState(true);
+    }
+
+    elPauseBtn.addEventListener("click", () => {
+        const nextState = !isPaused;
+        applyPauseState(nextState);
+
+        fetch("/api/stream/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paused: nextState })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && typeof data.paused === "boolean") {
+                applyPauseState(data.paused);
+            }
+        })
+        .catch(err => {
+            console.warn("Global stream control error:", err);
+        });
+
+        if (!nextState) {
             updateSensors();
             setupPolling();
         }

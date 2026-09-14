@@ -5,8 +5,12 @@
 # automated environmental and thermal alerts.
 
 # Differential Illuminance alert threshold (|Sensor 1 - Sensor 2|) in Lux
-# Triggers an Illuminance warning when delta exceeds this threshold.
+# Exceeding this threshold starts the persistence timer for illuminance alert.
 illuminance_threshold: 5000.0
+
+# Differential Illuminance persistence duration in seconds
+# Delta must continuously exceed illuminance_threshold for more than this duration to trigger illuminance alert.
+illuminance_persistence_seconds: 10
 
 # Raspberry Pi SoC Core CPU Temperature threshold in °C
 # Exceeding this threshold starts the persistence timer for overheating alert.
