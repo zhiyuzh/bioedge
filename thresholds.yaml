@@ -1,0 +1,13 @@
+# =============================================================
+# BioEdge Telemetry Alert Thresholds Configuration
+# =============================================================
+# This YAML configuration defines the operating thresholds for
+# automated environmental and thermal alerts.
+
+# Differential Illuminance alert threshold (|Sensor 1 - Sensor 2|) in Lux
+# Triggers an Illuminance warning when delta exceeds this threshold.
+illuminance_threshold: 50.0
+
+# Raspberry Pi SoC Core CPU Temperature threshold in °C
+# Triggers an Overheating warning when temperature exceeds this threshold for 10s.
+temperature_threshold: 55.0

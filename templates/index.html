@@ -1226,15 +1226,6 @@
                 <span id="sound_text">Audio ON</span>
             </button>
 
-            <!-- OS Desktop Notification Permission -->
-            <button id="notify_perm_btn" class="ctrl-btn" type="button" title="Enable Desktop OS Notifications">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-                <span id="notify_perm_text">Desktop Alerts</span>
-            </button>
-
             <select id="refresh_rate_select" class="ctrl-select" title="Refresh Interval">
                 <option value="1000">1.0s Interval</option>
                 <option value="2000">2.0s Interval</option>
@@ -1358,11 +1349,8 @@
                     <span id="light_rate_change" style="font-size: 0.74rem; color: var(--text-muted); margin-left: 6px; font-family: monospace;"></span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
-                    <label for="lux_threshold_input" style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Δ Threshold:</label>
-                    <div style="display: inline-flex; align-items: center; gap: 3px;">
-                        <input id="lux_threshold_input" type="number" min="1" max="5000" step="5" value="50" title="Alert when sudden shift in differential lux exceeds this value" style="width: 56px; padding: 2px 6px; border-radius: 6px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.76rem; font-family: monospace; text-align: right; outline: none;">
-                        <span style="font-size: 0.72rem; color: var(--text-muted);">Lux</span>
-                    </div>
+                    <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Δ Threshold:</span>
+                    <span id="lux_threshold_val" class="metric-secondary-val" style="color: var(--accent-amber); font-family: monospace;">{{ thresholds.illuminance_threshold if thresholds else 50.0 }} Lux</span>
                 </div>
             </div>
         </div>
@@ -1402,9 +1390,15 @@
                 <div id="pi_temp_meter" class="status-meter-bar" style="width: 40%; background: linear-gradient(90deg, #06b6d4, #3b82f6);"></div>
             </div>
 
-            <div class="metric-secondary">
-                <span>Thermal Status</span>
-                <span id="pi_status_label" class="metric-secondary-val" style="color: var(--accent-emerald);">Optimal</span>
+            <div class="metric-secondary" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <span>Thermal Status:</span>
+                    <span id="pi_status_label" class="metric-secondary-val" style="color: var(--accent-emerald); margin-left: 4px;">Optimal</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Threshold:</span>
+                    <span id="pi_threshold_val" class="metric-secondary-val" style="color: var(--accent-cyan); font-family: monospace;">>{{ thresholds.temperature_threshold if thresholds else 55.0 }}°C</span>
+                </div>
             </div>
 
         </div>
@@ -1527,6 +1521,7 @@
     const elPiMeter = document.getElementById("pi_temp_meter");
     const elPiStatus = document.getElementById("pi_status_label");
     const elPiAlertPill = document.getElementById("pi_alert_pill");
+    const elPiThresholdVal = document.getElementById("pi_threshold_val");
 
 
     const elTemp = document.getElementById("temperature");
@@ -1561,7 +1556,7 @@
     const elCardLight = document.getElementById("card_light");
     const elLightRateChange = document.getElementById("light_rate_change");
     const elLightAlertPill = document.getElementById("light_alert_pill");
-    const elLuxThresholdInput = document.getElementById("lux_threshold_input");
+    const elLuxThresholdVal = document.getElementById("lux_threshold_val");
     const elLuxAlertBanner = document.getElementById("lux_alert_banner");
     const elLuxAlertMsg = document.getElementById("lux_alert_msg");
     const elAlertDismissBtn = document.getElementById("alert_dismiss_btn");
@@ -1569,8 +1564,6 @@
     const elAlertSoundBtn = document.getElementById("alert_sound_btn");
     const elSoundText = document.getElementById("sound_text");
     const elSoundWaves = document.getElementById("sound_waves");
-    const elNotifyPermBtn = document.getElementById("notify_perm_btn");
-    const elNotifyPermText = document.getElementById("notify_perm_text");
 
     const elChartAvgBadge = document.getElementById("chart_avg_badge");
 
@@ -1579,7 +1572,7 @@
     let alertDismissedForCurrentCycle = false;
     let currentAlertActive = false;
     let luxAlertTimer = null;
-    const ALERT_HOLD_MS = 20000; // Hold notification visible for 20 seconds instead of 1 second
+    const ALERT_HOLD_MS = 20000; // Hold alert banner visible for 20 seconds instead of 1 second
 
     // 10-Second Sustained Lux Anomaly Tracking
     let anomalyActive = false;
@@ -1588,8 +1581,11 @@
     let anomalyNotified = false;
     let anomalyShiftAmount = 0;
 
-    // CPU Temperature Threshold Tracking (>50°C Alert, >=45°C Pending)
-    // CPU Temperature Threshold Tracking (>55°C Alert, >=45°C Pending)
+    // Operating Alert Thresholds loaded from thresholds.yaml (via backend /data)
+    let configIlluminanceThreshold = {{ thresholds.illuminance_threshold if thresholds else 50.0 }};
+    let configTemperatureThreshold = {{ thresholds.temperature_threshold if thresholds else 55.0 }};
+
+    // CPU Temperature Threshold Tracking
     let lastCpuAlertTime = 0;
     let cpuAlertActive = false;
     let cpuOverThresholdStart = null;
@@ -1663,7 +1659,7 @@
     }
 
     // -------------------------------------------------------------
-    // Web Audio API Chime & Desktop Notification
+    // Web Audio API Chime
     // -------------------------------------------------------------
     let audioCtx = null;
     let soundEnabled = localStorage.getItem("bioedge_sound_enabled") !== "false";
@@ -1688,85 +1684,48 @@
         window.removeEventListener("keydown", unlockAudio);
         window.removeEventListener("touchstart", unlockAudio);
     }
-    window.addEventListener("click", unlockAudio, { once: true });
-    window.addEventListener("keydown", unlockAudio, { once: true });
-    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("click", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+    window.addEventListener("touchstart", unlockAudio);
 
     function playAlertChime() {
         if (!soundEnabled) return;
-        const aCtx = getAudioContext();
-        if (!aCtx) return;
-
         try {
+            const aCtx = getAudioContext();
+            if (!aCtx) return;
+
             const now = aCtx.currentTime;
-            
-            // Oscillator 1 (tone 1: 587.33 Hz - D5)
+
+            // Dual tone chime: Note 1 (587.33 Hz - D5), Note 2 (880.00 Hz - A5)
             const osc1 = aCtx.createOscillator();
             const gain1 = aCtx.createGain();
             osc1.type = "sine";
             osc1.frequency.setValueAtTime(587.33, now);
-            gain1.gain.setValueAtTime(0.2, now);
-            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(0.25, now + 0.02);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
             osc1.connect(gain1);
             gain1.connect(aCtx.destination);
             osc1.start(now);
-            osc1.stop(now + 0.28);
+            osc1.stop(now + 0.35);
 
-            // Oscillator 2 (tone 2: 880 Hz - A5)
             const osc2 = aCtx.createOscillator();
             const gain2 = aCtx.createGain();
             osc2.type = "sine";
-            osc2.frequency.setValueAtTime(880, now + 0.14);
-            gain2.gain.setValueAtTime(0.001, now);
-            gain2.gain.setValueAtTime(0.22, now + 0.14);
+            osc2.frequency.setValueAtTime(880.00, now + 0.14);
+
+            gain2.gain.setValueAtTime(0, now + 0.14);
+            gain2.gain.linearRampToValueAtTime(0.28, now + 0.16);
             gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
             osc2.connect(gain2);
             gain2.connect(aCtx.destination);
             osc2.start(now + 0.14);
             osc2.stop(now + 0.5);
         } catch (err) {
             console.warn("Could not play alert chime:", err);
-        }
-    }
-
-    function sendDesktopNotification(title, body) {
-        if ("Notification" in window && Notification.permission === "granted") {
-            try {
-                new Notification(title, {
-                    body: body,
-                    tag: "bioedge-lux-alert",
-                    renotify: true,
-                    requireInteraction: true
-                });
-            } catch (e) {
-                console.warn("Desktop notification error:", e);
-            }
-        }
-    }
-
-    function updateNotificationBtnUI() {
-        if (!("Notification" in window)) {
-            if (elNotifyPermBtn) elNotifyPermBtn.style.display = "none";
-            return;
-        }
-        if (Notification.permission === "granted") {
-            if (elNotifyPermBtn) {
-                elNotifyPermBtn.style.display = "inline-flex";
-                elNotifyPermBtn.style.borderColor = "var(--accent-emerald)";
-                elNotifyPermBtn.style.color = "var(--accent-emerald)";
-                if (elNotifyPermText) elNotifyPermText.textContent = "Alerts Active";
-            }
-        } else if (Notification.permission === "denied") {
-            if (elNotifyPermBtn) {
-                elNotifyPermBtn.style.display = "inline-flex";
-                elNotifyPermBtn.style.opacity = "0.6";
-                if (elNotifyPermText) elNotifyPermText.textContent = "Alerts Blocked";
-            }
-        } else {
-            if (elNotifyPermBtn) {
-                elNotifyPermBtn.style.display = "inline-flex";
-                if (elNotifyPermText) elNotifyPermText.textContent = "Desktop Alerts";
-            }
         }
     }
 
@@ -1842,6 +1801,22 @@
                     setConnectionStatus('paused', 'STREAM PAUSED');
                 }
 
+                // Update dynamic thresholds from YAML config
+                if (data.thresholds) {
+                    if (data.thresholds.illuminance_threshold !== undefined) {
+                        configIlluminanceThreshold = Number(data.thresholds.illuminance_threshold);
+                        if (elLuxThresholdVal) {
+                            elLuxThresholdVal.textContent = `${configIlluminanceThreshold.toFixed(1)} Lux`;
+                        }
+                    }
+                    if (data.thresholds.temperature_threshold !== undefined) {
+                        configTemperatureThreshold = Number(data.thresholds.temperature_threshold);
+                        if (elPiThresholdVal) {
+                            elPiThresholdVal.textContent = `>${configTemperatureThreshold.toFixed(1)}°C`;
+                        }
+                    }
+                }
+
                 const now = new Date();
                 const timeLabel = now.toTimeString().split(" ")[0];
 
@@ -1858,8 +1833,8 @@
                     const piPct = Math.min(Math.max(((piNum - 30) / 40) * 100, 5), 100);
                     elPiMeter.style.width = piPct + "%";
 
-                    if (piNum > 55.0) {
-                        // CPU Overheating (> 55°C): Critical warning and notifications
+                    if (piNum > configTemperatureThreshold) {
+                        // CPU Overheating (> threshold): Critical warning and alerts
                         if (elCardPi) {
                             elCardPi.classList.remove("is-pending");
                             elCardPi.classList.add("is-overheating");
@@ -1869,7 +1844,7 @@
                             elPiAlertPill.className = "status-pill error";
                             elPiAlertPill.textContent = `🚨 OVERHEAT (${piNum.toFixed(1)}°C)`;
                         }
-                        elPiStatus.textContent = "OVERHEATING (>55°C)";
+                        elPiStatus.textContent = `OVERHEATING (>${configTemperatureThreshold.toFixed(0)}°C)`;
                         elPiStatus.style.color = "var(--accent-rose)";
                         elPiMeter.style.background = "var(--accent-rose)";
 
@@ -1888,7 +1863,7 @@
                                 "CPU temperature warning",
                                 `Over heat ${piNum.toFixed(1)}°C for ${elapsedSec}s since ${cpuStartTimeFormatted}`,
                                 `${piNum.toFixed(1)}°C`,
-                                "> 55.0°C"
+                                `> ${configTemperatureThreshold.toFixed(1)}°C`
                             );
                             lastCpuEmailDispatchedAt = curTsCpu;
                         }
@@ -1898,20 +1873,15 @@
                             cpuAlertActive = true;
                             lastCpuAlertTime = nowTs;
 
-                            sendDesktopNotification(
-                                "BioEdge • CPU Overheating Warning!",
-                                `SoC Core Temperature has exceeded 55°C (Current: ${piNum.toFixed(1)}°C)!`
-                            );
-
                             playAlertChime();
 
                             showAlertBanner(
-                                "⚠️ CPU OVERHEAT WARNING (>55°C)",
-                                `Raspberry Pi SoC Core Temperature has exceeded safe limit: <strong>${piNum.toFixed(1)}°C</strong> (Threshold: >55.0°C). Check cooling or reduce workload.`
+                                `⚠️ CPU OVERHEAT WARNING (>${configTemperatureThreshold.toFixed(0)}°C)`,
+                                `Raspberry Pi SoC Core Temperature has exceeded safe limit: <strong>${piNum.toFixed(1)}°C</strong> (Threshold: >${configTemperatureThreshold.toFixed(1)}°C). Check cooling or reduce workload.`
                             );
                         }
-                    } else if (piNum >= 45.0) {
-                        // Pending Warning (45°C - 55°C): Visual warning state, reset 10s overheat timer
+                    } else if (piNum >= Math.max(45.0, configTemperatureThreshold - 10.0)) {
+                        // Pending Warning: Visual warning state, reset 10s overheat timer
                         cpuOverThresholdStart = null;
                         cpuStartTimeFormatted = null;
                         if (elCardPi) {
@@ -1923,7 +1893,8 @@
                             elPiAlertPill.className = "status-pill paused";
                             elPiAlertPill.textContent = "⚠️ PENDING WARNING";
                         }
-                        elPiStatus.textContent = "Pending Warning (≥45°C)";
+                        const pendingThreshold = Math.max(45.0, configTemperatureThreshold - 10.0);
+                        elPiStatus.textContent = `Pending Warning (≥${pendingThreshold.toFixed(0)}°C)`;
                         elPiStatus.style.color = "var(--accent-amber)";
                         elPiMeter.style.background = "var(--accent-amber)";
                         cpuAlertActive = false;
@@ -2028,9 +1999,9 @@
                         if (elLightRateChange) elLightRateChange.textContent = '';
                     }
 
-                    const threshold = parseFloat(elLuxThresholdInput ? elLuxThresholdInput.value : 50) || 50;
+                    const threshold = configIlluminanceThreshold;
 
-                    // Condition: difference in illuminance values > threshold in the text box
+                    // Condition: difference in illuminance values > threshold defined in YAML
                     // (Checked unless paused; still sends when not live / viewing past data)
                     if (currentDiff > threshold) {
                         const curTsLux = Date.now();
@@ -2049,7 +2020,7 @@
                             lastLuxEmailDispatchedAt = curTsLux;
                         }
 
-                        // UI alerts (card highlight, pill, chime, desktop notification, banner)
+                        // UI alerts (card highlight, pill, chime, banner)
                         if (elCardLight) elCardLight.classList.add("is-abnormal");
                         if (elLightAlertPill) {
                             elLightAlertPill.style.display = "inline-flex";
@@ -2068,10 +2039,6 @@
                             );
 
                             playAlertChime();
-                            sendDesktopNotification(
-                                "BioEdge • Illuminance Warning",
-                                `Illuminance difference is above ${threshold} Lux since ${luxStartTimeFormatted}! Current: Δ ${currentDiff.toFixed(1)} Lux.`
-                            );
                         }
                     } else {
                         // Reset illuminance warning state when below threshold
@@ -2668,19 +2635,7 @@
     // -------------------------------------------------------------
     // Abnormal Lux Delta Controls & Event Handlers
     // -------------------------------------------------------------
-    // 1. Threshold Input Listener & Persistence
-    const savedLuxThreshold = localStorage.getItem("bioedge_lux_threshold") || "50";
-    if (elLuxThresholdInput) {
-        elLuxThresholdInput.value = savedLuxThreshold;
-        elLuxThresholdInput.addEventListener("change", (e) => {
-            let val = parseFloat(e.target.value);
-            if (isNaN(val) || val < 1) val = 50;
-            e.target.value = val;
-            localStorage.setItem("bioedge_lux_threshold", val);
-        });
-    }
-
-    // 2. Audio Chime Toggle Listener
+    // 1. Audio Chime Toggle Listener
     if (elAlertSoundBtn) {
         elAlertSoundBtn.addEventListener("click", () => {
             soundEnabled = !soundEnabled;
@@ -2693,24 +2648,7 @@
         });
     }
 
-    // 3. Desktop OS Notification Permission Listener
-    if (elNotifyPermBtn) {
-        elNotifyPermBtn.addEventListener("click", () => {
-            if ("Notification" in window) {
-                Notification.requestPermission().then((permission) => {
-                    updateNotificationBtnUI();
-                    if (permission === "granted") {
-                        sendDesktopNotification(
-                            "BioEdge Notifications Enabled",
-                            "You will receive desktop alerts when an abnormal lux delta is detected."
-                        );
-                    }
-                });
-            }
-        });
-    }
-
-    // 4. Alert Banner Dismiss Button
+    // 2. Alert Banner Dismiss Button
     if (elAlertDismissBtn) {
         elAlertDismissBtn.addEventListener("click", () => {
             hideLuxAlert();
@@ -2724,11 +2662,8 @@
         });
     }
 
-
-
-    // Initialize Audio & Notification UI states
+    // Initialize Audio UI state
     updateSoundBtnUI();
-    updateNotificationBtnUI();
 
     // Start Polling
     updateSensors();

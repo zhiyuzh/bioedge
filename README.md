@@ -1,6 +1,6 @@
 # BioEdge: Raspberry Pi Edge Telemetry & Environmental Monitoring System
 
-**BioEdge** is a real-time IoT edge telemetry and environmental sensing system engineered for Raspberry Pi. It integrates hardware sensors over the I2C bus with a lightweight Flask backend and a responsive, high-performance web dashboard featuring live canvas charts, differential sensor analysis, thermal protection heuristics, and multi-channel alerting (audio chimes, desktop OS notifications, and SMTP email alerts).
+**BioEdge** is a real-time IoT edge telemetry and environmental sensing system engineered for Raspberry Pi. It integrates hardware sensors over the I2C bus with a lightweight Flask backend and a responsive, high-performance web dashboard featuring live canvas charts, differential sensor analysis, thermal protection heuristics, and multi-channel alerting (audio chimes, visual banners, and automated email alerts).
 
 ---
 
@@ -34,7 +34,7 @@
   +------------v-------------+                 +-------------v------------+
   |    Web Dashboard UI      |                 |   Alerting Infrastructure|
   |  - Canvas Stream Visualizer|               |  - Web Audio Synthesizer |
-  |  - Dual Light Delta Calc |                 |  - Desktop Notifications |
+  |  - Dual Light Delta Calc |                 |  - Visual Warning Banners|
   |  - Dark / Light / Cyber  |                 |  - SMTP / Local MTA Relay|
   +--------------------------+                 +--------------------------+
 ```
@@ -50,10 +50,9 @@
 - **SoC Core Thermal Monitoring**: Queries the Raspberry Pi Broadcom SoC temperature in real time using `vcgencmd measure_temp`.
 
 ### 2. Intelligent Multi-Tier Alert System
-- **Thermal Safety Guard**: Tracks CPU temperatures with configurable thresholds. If core temperatures exceed **50.0°C for 10 consecutive seconds**, an alert triggers across all notification channels.
-- **Illuminance Anomaly Detection**: Warns if sudden differential lux shifts exceed the user-defined threshold (default: 50 Lux).
+- **Thermal Safety Guard**: Tracks CPU temperatures with configurable thresholds. If core temperatures exceed configured limits for 10 consecutive seconds, an alert triggers.
+- **Illuminance Anomaly Detection**: Warns if differential lux shifts exceed the YAML-defined threshold.
 - **Web Audio API Chime**: Generates in-browser synthesized acoustic alert tones (dual-frequency harmonic chime: 587.33 Hz D5 & 880 Hz A5) without external sound assets.
-- **Desktop OS Push Notifications**: Web Notifications API integration to alert users even when the browser tab is in the background.
 - **Automated Email Dispatch**:
   - Outgoing alert messages sent over SMTP relay (with TLS) or local mail transfer agent (MTA).
   - 60-second cooldown throttling to prevent inbox spamming during sustained anomalies.

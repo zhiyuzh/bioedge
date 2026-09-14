@@ -5,6 +5,7 @@ import subprocess
 import os
 import datetime
 import smtplib
+import yaml
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -134,12 +135,74 @@ def read_light(address):
         print(f"Error reading GY-302 {hex(address)}: {e}")
         return None
 # -------------------------------------------------
+# Thresholds Configuration Loader (YAML)
+# -------------------------------------------------
+
+_thresholds_cache = None
+_thresholds_mtime = 0
+
+def load_thresholds():
+    global _thresholds_cache, _thresholds_mtime
+    config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "thresholds.yaml")
+    if not os.path.exists(config_file):
+        alt_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
+        if os.path.exists(alt_config):
+            config_file = alt_config
+
+    defaults = {
+        "illuminance_threshold": 50.0,
+        "temperature_threshold": 55.0
+    }
+
+    if not os.path.exists(config_file):
+        return defaults
+
+    try:
+        mtime = os.path.getmtime(config_file)
+        if _thresholds_cache is not None and mtime == _thresholds_mtime:
+            return _thresholds_cache
+
+        with open(config_file, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+
+        thresholds = dict(defaults)
+        if isinstance(cfg, dict):
+            if "illuminance_threshold" in cfg:
+                thresholds["illuminance_threshold"] = float(cfg["illuminance_threshold"])
+            elif "illuminance_difference_threshold" in cfg:
+                thresholds["illuminance_threshold"] = float(cfg["illuminance_difference_threshold"])
+            elif "illuminance" in cfg:
+                if isinstance(cfg["illuminance"], dict):
+                    thresholds["illuminance_threshold"] = float(cfg["illuminance"].get("threshold", cfg["illuminance"].get("difference_threshold", 50.0)))
+                else:
+                    thresholds["illuminance_threshold"] = float(cfg["illuminance"])
+
+            if "temperature_threshold" in cfg:
+                thresholds["temperature_threshold"] = float(cfg["temperature_threshold"])
+            elif "cpu_temperature_threshold" in cfg:
+                thresholds["temperature_threshold"] = float(cfg["cpu_temperature_threshold"])
+            elif "temperature" in cfg:
+                if isinstance(cfg["temperature"], dict):
+                    thresholds["temperature_threshold"] = float(cfg["temperature"].get("threshold", cfg["temperature"].get("cpu_threshold", 55.0)))
+                else:
+                    thresholds["temperature_threshold"] = float(cfg["temperature"])
+
+        _thresholds_cache = thresholds
+        _thresholds_mtime = mtime
+        return thresholds
+    except Exception as e:
+        print(f"[BioEdge YAML Load Error]: {e}")
+        return defaults
+
+
+# -------------------------------------------------
 # Flask webpage
 # -------------------------------------------------
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    thresholds = load_thresholds()
+    return render_template("index.html", thresholds=thresholds)
 
 
 # -------------------------------------------------
@@ -159,14 +222,22 @@ def data():
     lux1 = read_light(0x23)
     lux2 = read_light(0x5C)
 
+    thresholds = load_thresholds()
+
     return jsonify({
         "pi_temperature": pi_temperature,
         "temperature": round(temperature, 2) if temperature is not None else None,
         "pressure": round(pressure, 2) if pressure is not None else None,
         "pressure_mmhg": round(pressure * 0.750062, 2) if pressure is not None else None,
         "light_1_lux": round(lux1, 2) if lux1 is not None else None,
-        "light_2_lux": round(lux2, 2) if lux2 is not None else None
+        "light_2_lux": round(lux2, 2) if lux2 is not None else None,
+        "thresholds": thresholds
     })
+
+
+@app.route("/api/thresholds")
+def get_thresholds():
+    return jsonify(load_thresholds())
 
 
 def load_email_list():
