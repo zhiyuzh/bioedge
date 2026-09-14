@@ -1503,7 +1503,8 @@
         piTemp: [],
         pressure: [],
         light1: [],
-        light2: []
+        light2: [],
+        lightDiff: []
     };
 
     let activeChartMode = 'temp'; // 'temp' | 'pressure' | 'light'
@@ -2141,6 +2142,8 @@
 
 
                 // 5. Append to History Buffer
+                const diffVal = (lux1 !== null && lux2 !== null) ? Math.abs(lux1 - lux2) : null;
+
                 if (historyData.timestamps.length >= MAX_HISTORY) {
                     historyData.timestamps.shift();
                     historyData.temp.shift();
@@ -2148,6 +2151,7 @@
                     historyData.pressure.shift();
                     historyData.light1.shift();
                     historyData.light2.shift();
+                    historyData.lightDiff.shift();
                 }
 
                 historyData.timestamps.push(timeLabel);
@@ -2156,6 +2160,7 @@
                 historyData.pressure.push(pressMmHg);
                 historyData.light1.push(lux1);
                 historyData.light2.push(lux2);
+                historyData.lightDiff.push(diffVal);
 
                 // If user is inspecting past data, increment viewOffset so the viewport stays locked on the exact historical moments
                 if (viewOffset > 0) {
@@ -2212,37 +2217,50 @@
             seriesList.push({
                 name: 'Ambient BMP280',
                 color: isRainbow ? '#ff007f' : '#f43f5e',
-                data: historyData.temp
+                data: historyData.temp,
+                axis: 'left'
             });
             seriesList.push({
                 name: 'Pi CPU Core',
                 color: isRainbow ? '#00e5ff' : '#06b6d4',
-                data: historyData.piTemp
+                data: historyData.piTemp,
+                axis: 'left'
             });
         } else if (activeChartMode === 'pressure') {
             seriesList.push({
                 name: 'Pressure (mmHg)',
                 color: isRainbow ? '#c084fc' : '#818cf8',
-                data: historyData.pressure
+                data: historyData.pressure,
+                axis: 'left'
             });
         } else if (activeChartMode === 'light') {
             seriesList.push({
                 name: 'Sensor 1 (0x23)',
                 color: isRainbow ? '#fee440' : '#f59e0b',
-                data: historyData.light1
+                data: historyData.light1,
+                axis: 'left'
             });
             seriesList.push({
                 name: 'Sensor 2 (0x5C)',
                 color: isRainbow ? '#00f5d4' : '#10b981',
-                data: historyData.light2
+                data: historyData.light2,
+                axis: 'left'
+            });
+            seriesList.push({
+                name: 'Delta',
+                color: isRainbow ? '#ec4899' : '#818cf8',
+                data: historyData.lightDiff,
+                axis: 'right'
             });
         }
+
+        const hasDualAxis = seriesList.some(s => s.axis === 'right');
 
         // Update Legend
         elChartLegend.innerHTML = seriesList.map(s => `
             <div class="legend-item">
                 <span class="legend-color" style="background: ${s.color};"></span>
-                <span>${s.name}</span>
+                <span>${s.name}${hasDualAxis ? (s.axis === 'right' ? ' (Right Axis)' : ' (Left Axis)') : ''}</span>
             </div>
         `).join('');
 
@@ -2268,37 +2286,63 @@
         const visibleSeries = seriesList.map(s => ({
             name: s.name,
             color: s.color,
+            axis: s.axis || 'left',
             data: s.data.slice(startIndex, endIndex)
         }));
 
-        // Calculate Min and Max bounds across visible slice
-        let minVal = Infinity;
-        let maxVal = -Infinity;
-
-        visibleSeries.forEach(s => {
+        // Calculate Left Axis Bounds (Ambient/Pi Temp, Pressure, or Light Sensors 1 & 2)
+        let minValLeft = Infinity;
+        let maxValLeft = -Infinity;
+        visibleSeries.filter(s => s.axis !== 'right').forEach(s => {
             s.data.forEach(v => {
                 if (v !== null && !isNaN(v)) {
-                    if (v < minVal) minVal = v;
-                    if (v > maxVal) maxVal = v;
+                    if (v < minValLeft) minValLeft = v;
+                    if (v > maxValLeft) maxValLeft = v;
                 }
             });
         });
 
-        if (minVal === Infinity || maxVal === -Infinity) {
-            minVal = 0;
-            maxVal = 100;
-        } else if (minVal === maxVal) {
-            minVal -= 5;
-            maxVal += 5;
+        if (minValLeft === Infinity || maxValLeft === -Infinity) {
+            minValLeft = 0;
+            maxValLeft = 100;
+        } else if (minValLeft === maxValLeft) {
+            minValLeft -= 5;
+            maxValLeft += 5;
         } else {
-            const padding = (maxVal - minVal) * 0.15;
-            minVal -= padding;
-            maxVal += padding;
+            const padding = (maxValLeft - minValLeft) * 0.15;
+            minValLeft -= padding;
+            maxValLeft += padding;
+        }
+
+        // Calculate Right Axis Bounds (Delta)
+        let minValRight = Infinity;
+        let maxValRight = -Infinity;
+        if (hasDualAxis) {
+            visibleSeries.filter(s => s.axis === 'right').forEach(s => {
+                s.data.forEach(v => {
+                    if (v !== null && !isNaN(v)) {
+                        if (v < minValRight) minValRight = v;
+                        if (v > maxValRight) maxValRight = v;
+                    }
+                });
+            });
+
+            if (minValRight === Infinity || maxValRight === -Infinity) {
+                minValRight = 0;
+                maxValRight = 100;
+            } else if (minValRight === maxValRight) {
+                minValRight = Math.max(0, minValRight - 5);
+                maxValRight += 5;
+            } else {
+                const padding = (maxValRight - minValRight) * 0.15;
+                minValRight = Math.max(0, minValRight - padding);
+                maxValRight += padding;
+            }
         }
 
         const paddingLeft = 55;
-        const paddingRight = 20;
-        const paddingTop = 20;
+        const paddingRight = hasDualAxis ? 55 : 20;
+        const paddingTop = 22;
         const paddingBottom = 30;
         const plotWidth = width - paddingLeft - paddingRight;
         const plotHeight = height - paddingTop - paddingBottom;
@@ -2306,22 +2350,43 @@
         // Draw horizontal gridlines & Y-Axis values
         const gridSteps = 4;
         ctx.strokeStyle = isRainbow ? 'rgba(192, 132, 252, 0.16)' : (isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.06)');
-        ctx.fillStyle = isRainbow ? '#d8b4fe' : (isLight ? '#475569' : '#64748b');
         ctx.font = '10px monospace';
-        ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
         for (let i = 0; i <= gridSteps; i++) {
             const yRatio = i / gridSteps;
             const y = paddingTop + plotHeight * (1 - yRatio);
-            const val = minVal + (maxVal - minVal) * yRatio;
+            const valLeft = minValLeft + (maxValLeft - minValLeft) * yRatio;
 
             ctx.beginPath();
             ctx.moveTo(paddingLeft, y);
             ctx.lineTo(width - paddingRight, y);
             ctx.stroke();
 
-            ctx.fillText(val.toFixed(1), paddingLeft - 8, y);
+            // Left Y-Axis labels (Sensors)
+            ctx.textAlign = 'right';
+            ctx.fillStyle = isRainbow ? '#d8b4fe' : (isLight ? '#475569' : '#64748b');
+            ctx.fillText(valLeft.toFixed(1), paddingLeft - 8, y);
+
+            // Right Y-Axis labels (Delta data)
+            if (hasDualAxis) {
+                const valRight = minValRight + (maxValRight - minValRight) * yRatio;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = isRainbow ? '#f472b6' : '#818cf8';
+                ctx.fillText(valRight.toFixed(1), width - paddingRight + 8, y);
+            }
+        }
+
+        // Draw Axis Title Badges if Dual Axis
+        if (hasDualAxis) {
+            ctx.font = 'bold 9px monospace';
+            ctx.fillStyle = isRainbow ? '#d8b4fe' : (isLight ? '#475569' : '#94a3b8');
+            ctx.textAlign = 'right';
+            ctx.fillText('Sensors (Lux)', paddingLeft - 4, paddingTop - 8);
+
+            ctx.fillStyle = isRainbow ? '#f472b6' : '#818cf8';
+            ctx.textAlign = 'left';
+            ctx.fillText('Δ Delta (Lux)', width - paddingRight + 4, paddingTop - 8);
         }
 
         const count = visibleTimestamps.length;
@@ -2344,12 +2409,16 @@
 
         // Draw Each Series Line
         visibleSeries.forEach(series => {
+            const isRightAxis = series.axis === 'right';
+            const sMin = isRightAxis ? minValRight : minValLeft;
+            const sMax = isRightAxis ? maxValRight : maxValLeft;
+
             const validPoints = [];
             for (let i = 0; i < count; i++) {
                 const val = series.data[i];
                 if (val !== null && !isNaN(val)) {
                     const x = paddingLeft + i * stepX;
-                    const y = paddingTop + plotHeight * (1 - (val - minVal) / (maxVal - minVal));
+                    const y = paddingTop + plotHeight * (1 - (val - sMin) / (sMax - sMin));
                     validPoints.push({ x, y, val, idx: i });
                 }
             }
@@ -2391,7 +2460,7 @@
             const validVals = validPoints.map(p => p.val);
             const seriesAvg = validVals.length > 0 ? (validVals.reduce((a, b) => a + b, 0) / validVals.length) : null;
             if (seriesAvg !== null) {
-                const avgY = paddingTop + plotHeight * (1 - (seriesAvg - minVal) / (maxVal - minVal));
+                const avgY = paddingTop + plotHeight * (1 - (seriesAvg - sMin) / (sMax - sMin));
                 ctx.save();
                 ctx.setLineDash([5, 4]);
                 ctx.strokeStyle = series.color;
@@ -2402,19 +2471,33 @@
                 ctx.lineTo(width - paddingRight, avgY);
                 ctx.stroke();
 
-                // Average label on right margin
+                // Average label on margin
                 ctx.globalAlpha = 0.85;
                 ctx.font = '9px monospace';
-                ctx.textAlign = 'right';
-                ctx.fillStyle = series.color;
-                ctx.fillText(`AVG: ${seriesAvg.toFixed(1)}`, width - paddingRight - 4, avgY - 4);
+                if (isRightAxis) {
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = series.color;
+                    ctx.fillText(`AVG: ${seriesAvg.toFixed(1)}`, width - paddingRight - 4, avgY - 4);
+                } else {
+                    ctx.textAlign = hasDualAxis ? 'left' : 'right';
+                    ctx.fillStyle = series.color;
+                    ctx.fillText(`AVG: ${seriesAvg.toFixed(1)}`, hasDualAxis ? paddingLeft + 4 : width - paddingRight - 4, avgY - 4);
+                }
                 ctx.restore();
             }
         });
 
         // Update Window Average Badge in Header
         if (elChartAvgBadge) {
-            if (visibleSeries.length > 0) {
+            if (activeChartMode === 'light' && visibleSeries.length >= 3) {
+                const s1Vals = visibleSeries[0].data.filter(v => v !== null && !isNaN(v));
+                const s2Vals = visibleSeries[1].data.filter(v => v !== null && !isNaN(v));
+                const dVals = visibleSeries[2].data.filter(v => v !== null && !isNaN(v));
+                const s1Avg = s1Vals.length > 0 ? (s1Vals.reduce((a, b) => a + b, 0) / s1Vals.length).toFixed(1) : '--';
+                const s2Avg = s2Vals.length > 0 ? (s2Vals.reduce((a, b) => a + b, 0) / s2Vals.length).toFixed(1) : '--';
+                const dAvg = dVals.length > 0 ? (dVals.reduce((a, b) => a + b, 0) / dVals.length).toFixed(1) : '--';
+                elChartAvgBadge.textContent = `Avg: S1: ${s1Avg} | S2: ${s2Avg} | Δ: ${dAvg} Lux`;
+            } else if (visibleSeries.length > 0) {
                 const primarySeries = visibleSeries[0];
                 const validVals = primarySeries.data.filter(v => v !== null && !isNaN(v));
                 if (validVals.length > 0) {
@@ -2451,9 +2534,13 @@
             // Highlight points on curves
             const tooltipLines = [`Time: ${timeAtPoint}`];
             visibleSeries.forEach(series => {
+                const isRightAxis = series.axis === 'right';
+                const sMin = isRightAxis ? minValRight : minValLeft;
+                const sMax = isRightAxis ? maxValRight : maxValLeft;
+
                 const val = series.data[closestIdx];
                 if (val !== null && !isNaN(val)) {
-                    const y = paddingTop + plotHeight * (1 - (val - minVal) / (maxVal - minVal));
+                    const y = paddingTop + plotHeight * (1 - (val - sMin) / (sMax - sMin));
                     ctx.fillStyle = series.color;
                     ctx.beginPath();
                     ctx.arc(pointX, y, 5.5, 0, Math.PI * 2);
@@ -2465,7 +2552,8 @@
                     const seriesVals = series.data.filter(v => v !== null && !isNaN(v));
                     const sAvg = seriesVals.length > 0 ? (seriesVals.reduce((a, b) => a + b, 0) / seriesVals.length) : null;
                     const avgStr = sAvg !== null ? ` (Avg: ${sAvg.toFixed(1)})` : '';
-                    tooltipLines.push(`${series.name}: ${val.toFixed(1)}${avgStr}`);
+                    const axisTag = hasDualAxis ? (isRightAxis ? ' [Right]' : ' [Left]') : '';
+                    tooltipLines.push(`${series.name}${axisTag}: ${val.toFixed(1)}${avgStr}`);
                 }
             });
 
