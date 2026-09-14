@@ -23,13 +23,13 @@ temperature_persistence_seconds: 10
 
 
 # =============================================================
-# SMTP Email Dispatch Configuration (Optional)
+# Email Alert Dispatch Configuration (Optional)
 # =============================================================
-# Credentials can be loaded securely from gitignored .env (recommended)
+# Credentials should be loaded securely from gitignored .env (recommended)
 # or configured directly below:
-# smtp:
-#   host: "smtp.gmail.com"
-#   port: 587
-#   user: "your_email@gmail.com"
-#   pass: "your_16_char_app_password"
-#   from: "your_email@gmail.com"
+
+# Brevo REST API (HTTPS Port 443)
+# brevo:
+#   api_key: "xkeysib-..."
+#   sender_email: "alerts@attolab.org"
+#   sender_name: "BioEdge Telemetry"

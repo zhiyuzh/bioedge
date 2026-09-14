@@ -4,10 +4,10 @@ import subprocess
 
 import os
 import datetime
-import smtplib
+import json
+import urllib.request
+import urllib.error
 import yaml
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 from flask import Flask, render_template, jsonify, request
 
@@ -330,6 +330,47 @@ def load_email_list():
     return recipients
 
 
+def send_brevo_api_email(api_key, sender_email, sender_name, recipients, subject, body):
+    """
+    Dispatches transactional email via Brevo REST API v3 (POST https://api.brevo.com/v3/smtp/email).
+    Returns (success: bool, delivery_status: str).
+    """
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json",
+        "user-agent": "BioEdge/1.0"
+    }
+    payload = {
+        "sender": {
+            "name": sender_name or "BioEdge Telemetry",
+            "email": sender_email
+        },
+        "to": [{"email": r} for r in recipients],
+        "subject": subject,
+        "textContent": body
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp_body = resp.read().decode("utf-8")
+            resp_data = json.loads(resp_body) if resp_body else {}
+            msg_id = resp_data.get("messageId", "sent")
+            return True, f"DELIVERED via Brevo API ({msg_id}) to {len(recipients)} recipients"
+    except urllib.error.HTTPError as e:
+        err_msg = ""
+        try:
+            err_json = json.loads(e.read().decode("utf-8"))
+            err_msg = err_json.get("message") or str(err_json)
+        except Exception:
+            err_msg = f"HTTP {e.code}"
+        return False, f"FAILED: Brevo API Error ({err_msg})"
+    except Exception as e:
+        return False, f"FAILED: Brevo API Error ({e})"
+
+
 # -------------------------------------------------
 # Email Alert Dispatcher API
 # -------------------------------------------------
@@ -388,77 +429,44 @@ def send_email_alert():
                 "note": delivery_status
             })
 
-        # 1. Reload .env and check environment variables for SMTP credentials
+        # 1. Reload .env and check environment variables
         load_env_file()
-        smtp_host = os.environ.get("SMTP_HOST")
-        smtp_port = int(os.environ.get("SMTP_PORT", 587))
-        smtp_user = os.environ.get("SMTP_USER") or os.environ.get("GMAIL_USER")
-        smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASS")
-        smtp_from = os.environ.get("SMTP_FROM")
+        brevo_api_key = os.environ.get("BREVO_API_KEY")
+        brevo_sender_email = os.environ.get("BREVO_SENDER_EMAIL")
+        brevo_sender_name = os.environ.get("BREVO_SENDER_NAME", "BioEdge Telemetry")
 
-        # 2. Check thresholds.yaml for optional SMTP credentials if not in environment
-        if not (smtp_user and smtp_pass):
-            config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "thresholds.yaml")
-            if os.path.exists(config_file):
-                try:
-                    with open(config_file, "r", encoding="utf-8") as f:
-                        cfg = yaml.safe_load(f) or {}
-                    if isinstance(cfg, dict):
-                        smtp_cfg = cfg.get("smtp") or cfg.get("email") or {}
-                        if isinstance(smtp_cfg, dict):
-                            smtp_user = smtp_user or smtp_cfg.get("user") or smtp_cfg.get("username") or smtp_cfg.get("smtp_user")
-                            smtp_pass = smtp_pass or smtp_cfg.get("pass") or smtp_cfg.get("password") or smtp_cfg.get("smtp_pass")
-                            smtp_host = smtp_host or smtp_cfg.get("host")
-                            if "port" in smtp_cfg:
-                                smtp_port = int(smtp_cfg["port"])
-                            smtp_from = smtp_from or smtp_cfg.get("from")
-                        else:
-                            smtp_user = smtp_user or cfg.get("smtp_user") or cfg.get("gmail_user")
-                            smtp_pass = smtp_pass or cfg.get("smtp_pass") or cfg.get("gmail_app_pass")
-                except Exception:
-                    pass
-
-        smtp_host = smtp_host or "smtp.gmail.com"
-        smtp_from = smtp_from or (smtp_user or "bioedge-alert@gmail.com")
+        # 2. Check thresholds.yaml for optional credentials if not in environment
+        config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "thresholds.yaml")
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    cfg = yaml.safe_load(f) or {}
+                if isinstance(cfg, dict):
+                    brevo_cfg = cfg.get("brevo") or {}
+                    if isinstance(brevo_cfg, dict):
+                        brevo_api_key = brevo_api_key or brevo_cfg.get("api_key")
+                        brevo_sender_email = brevo_sender_email or brevo_cfg.get("sender_email") or brevo_cfg.get("from")
+                        brevo_sender_name = brevo_sender_name or brevo_cfg.get("sender_name")
+            except Exception:
+                pass
 
         email_sent = False
-        delivery_status = "NOT DELIVERED (No SMTP credentials configured - logged to disk only)"
+        delivery_status = "NOT DELIVERED (No Brevo API credentials configured - logged to disk only)"
 
-        if smtp_user and smtp_pass and recipients:
-            try:
-                msg = MIMEMultipart()
-                msg["From"] = smtp_from
-                msg["To"] = ", ".join(recipients)
-                msg["Subject"] = subject
-                msg.attach(MIMEText(body, "plain"))
-
-                server = smtplib.SMTP(smtp_host, smtp_port, timeout=8)
-                if smtp_port == 587:
-                    server.starttls()
-                server.login(smtp_user, smtp_pass)
-                server.sendmail(smtp_from, recipients, msg.as_string())
-                server.quit()
-                email_sent = True
-                delivery_status = f"DELIVERED via SMTP ({smtp_host}) to {len(recipients)} recipients"
-            except Exception as e:
-                delivery_status = f"FAILED: SMTP Error ({e})"
-                print(f"[BioEdge SMTP Error]: {e}")
-        elif recipients:
-            # Attempt local SMTP on port 25 as fallback
-            try:
-                msg = MIMEMultipart()
-                msg["From"] = "bioedge-alert@localhost"
-                msg["To"] = ", ".join(recipients)
-                msg["Subject"] = subject
-                msg.attach(MIMEText(body, "plain"))
-
-                server = smtplib.SMTP("localhost", 25, timeout=2)
-                server.sendmail("bioedge-alert@localhost", recipients, msg.as_string())
-                server.quit()
-                email_sent = True
-                delivery_status = f"DELIVERED via local mail agent to {len(recipients)} recipients"
-            except Exception:
-                delivery_status = "NOT DELIVERED (No SMTP credentials configured; local port 25 closed - logged to disk only)"
+        # Brevo REST API (HTTPS Port 443)
+        if brevo_api_key and brevo_sender_email and recipients:
+            email_sent, delivery_status = send_brevo_api_email(
+                api_key=brevo_api_key,
+                sender_email=brevo_sender_email,
+                sender_name=brevo_sender_name,
+                recipients=recipients,
+                subject=subject,
+                body=body
+            )
+            if not email_sent:
+                print(f"[BioEdge Brevo API Error]: {delivery_status}")
+        elif not recipients:
+            delivery_status = "NOT DELIVERED (Recipient roster empty - logged to disk only)"
 
         # Log to disk with exact Subject, Status, Send to, and Body
         log_entry = (

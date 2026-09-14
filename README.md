@@ -37,7 +37,7 @@
   |    Web Dashboard UI      |                 |   Alerting Infrastructure|
   |  - Canvas Stream Curves  |                 |  - Web Audio Synthesizer |
   |  - Dual Light Delta Calc |                 |  - Visual Warning Banners|
-  |  - Global Pause Control  |                 |  - SMTP (TLS) / MTA Relay|
+  |  - Global Pause Control  |                 |  - Brevo API / HTTPS     |
   |  - Dark / Light / Cyber  |                 |  - 5-Min Email Cooldown  |
   +--------------------------+                 +--------------------------+
 ```
@@ -60,7 +60,7 @@
 - **Web Audio API Chime**: Generates in-browser synthesized acoustic alert tones (dual-frequency harmonic chime: 587.33 Hz D5 & 880.00 Hz A5) without external sound files.
 - **Automated Team Email Dispatch**:
   - Automatically emails all team members registered in `email.list`.
-  - Supports external SMTP relays with TLS (e.g. Gmail with App Passwords, SendGrid, Amazon SES) or fallback to local MTA (`localhost:25`).
+  - Dispatches alerts reliably via Brevo REST API v3 over HTTPS (Port 443).
   - Strict 5-minute (`300,000 ms`) cooldown throttling per anomaly channel to prevent inbox flooding during sustained issues.
   - Complete disk audit trail logged to `alert_emails.log` with true delivery verification status.
 
@@ -239,24 +239,20 @@ Alert emails are managed by a dedicated dispatch module in `app.py`:
    - Automatically loaded and broadcast to all members on every alert dispatch.
 
 2. **Credential Loading Priority**:
-   - **Tier 1 (Recommended)**: Loaded from local `.env` file (gitignored for security):
+   - **Tier 1 (Environment Variables - Recommended)**: Loaded from local `.env` file (gitignored for security):
      ```bash
-     SMTP_HOST=smtp.gmail.com
-     SMTP_PORT=587
-     SMTP_USER=your_email@gmail.com
-     SMTP_PASS=your_16_character_app_password
-     SMTP_FROM=your_email@gmail.com
+     BREVO_API_KEY="xkeysib-..."
+     BREVO_SENDER_EMAIL="alerts@your-authenticated-domain.com"
+     BREVO_SENDER_NAME="BioEdge Telemetry"
      ```
-   - **Tier 2**: Fallback to `thresholds.yaml` under the `smtp:` key.
-   - **Tier 3 (Local MTA)**: Fallback attempt to `localhost:25` without authentication.
+   - **Tier 2 (Configuration File)**: Fallback to `thresholds.yaml` under the `brevo:` key.
 
 3. **Audit Trail (`alert_emails.log`)**:
    - Every alert attempt is written to `alert_emails.log` with a verified delivery status:
-     - `DELIVERED via SMTP (smtp.gmail.com) to N recipients`
-     - `DELIVERED via local mail agent to N recipients`
+     - `DELIVERED via Brevo API (<id>) to N recipients`
      - `SUPPRESSED (Stream is globally paused by user)`
-     - `NOT DELIVERED (No SMTP credentials configured; local port 25 closed - logged to disk only)`
-     - `FAILED: SMTP Error (...)`
+     - `NOT DELIVERED (No Brevo API credentials configured - logged to disk only)`
+     - `FAILED: Brevo API Error (...)`
 
 ---
 
@@ -325,26 +321,27 @@ temperature_persistence_seconds: 10
 ```
 
 ### 2. Team Notification List (`email.list`)
-Add your alert recipients to `email.list` (one per line):
+Create `email.list` in the project root (excluded by `.gitignore` to keep contact lists private) or copy from `email.list.example`:
+```bash
+cp email.list.example email.list
+```
+Add your alert recipients to `email.list` (one address per line):
 ```
 alice@example.com
 bob@example.com
-zhiyuzh@gmail.com
 ```
 
-### 3. SMTP Credentials Setup (`.env`)
-Create a `.env` file in the project root with your SMTP provider credentials (this file is excluded by `.gitignore`):
+### 3. Email Credentials Setup (`.env`)
+Create or edit `.env` in the project root with your Brevo API credentials (this file is excluded by `.gitignore`):
 
 ```bash
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-google-app-password
-SMTP_FROM=your-email@gmail.com
+BREVO_API_KEY="xkeysib-your_brevo_api_key"
+BREVO_SENDER_EMAIL="alerts@your-authenticated-domain.com"
+BREVO_SENDER_NAME="BioEdge Telemetry"
 ```
 
-> [!NOTE]
-> For Gmail, use an **App Password** (generated from Google Account -> Security -> 2-Step Verification -> App passwords). Standard account passwords will be rejected with `535-5.7.8 BadCredentials`.
+> [!TIP]
+> Make sure `BREVO_SENDER_EMAIL` matches the exact root domain authenticated in Brevo (e.g., `alerts@attolab.org` if `attolab.org` is your verified domain). If you manage IP restrictions in Brevo, ensure your network IP is authorized or IP check is disabled under Brevo Security settings.
 
 ---
 
@@ -469,10 +466,10 @@ bioedge/
 ├── app.py              # Main Flask application, sensor drivers, and stream control
 ├── sensor_read.py      # Standalone dual-sensor diagnostic CLI utility
 ├── thresholds.yaml     # Operating alert thresholds and persistence durations
-├── email.list          # Team alert distribution list
+├── email.list.example  # Template team alert distribution list (email.list is gitignored)
 ├── alert_emails.log    # Audit trail of all alert dispatches with delivery statuses
 ├── requirements.txt    # Python package dependencies
-├── .env                # Private SMTP credentials (gitignored)
+├── .env                # Private Brevo API credentials (gitignored)
 ├── .gitignore          # Git exclusion rules (caches, logs, secrets)
 ├── templates/
 │   └── index.html      # Comprehensive real-time dashboard UI & visualizer

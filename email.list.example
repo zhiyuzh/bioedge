@@ -1,0 +1,6 @@
+# Team email notification recipient list (one address per line)
+# Copy this file to email.list and add your team member emails:
+# cp email.list.example email.list
+
+alice@example.com
+bob@example.com
