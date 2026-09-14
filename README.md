@@ -49,7 +49,7 @@
 ### 1. Hardware & Environmental Telemetry
 - **Ambient Temperature & Barometric Pressure (Bosch BMP280)**: Reads calibrated temperature (°C / °F) and atmospheric pressure (dual display: mmHg primary and hPa secondary) using Bosch's native 64-bit integer compensation formulas.
 - **Dual Ambient Light Sensing (Rohm BH1750 / GY-302)**: Reads illuminance in Lux simultaneously across two distinct I2C addresses (`0x23` and `0x5C`).
-- **Differential Lux Delta Analysis**: Computes real-time Lux differences ($\Delta\text{Lux} = |\text{Sensor}_1 - \text{Sensor}_2|$) and rate-of-change between dual sensors to detect shadowing, directional occlusion, or sensor failures.
+- **Differential Lux Delta Analysis**: Computes real-time Lux differences (`ΔLux = |Sensor 1 - Sensor 2|`) and rate-of-change between dual sensors to detect shadowing, directional occlusion, or sensor failures.
 - **SoC Core Thermal Monitoring**: Continuously queries the Raspberry Pi Broadcom SoC temperature via `vcgencmd measure_temp`.
 
 ### 2. Intelligent Multi-Tier Alert System
@@ -85,19 +85,21 @@ BioEdge implements a comprehensive dual-parameter alert heuristic: a **magnitude
 
 | Alert Channel | Measured Metric | Trigger Condition | Persistence Required | Global Pause Behavior | Email Cooldown | Audio / Visual Actions |
 |---|---|---|---|---|---|---|
-| **Differential Illuminance** | $\Delta\text{Lux} = \|\text{Lux}_1 - \text{Lux}_2\|$ | $\Delta\text{Lux} > \text{illuminance\_threshold}$ | $> \text{illuminance\_persistence\_seconds}$ (default: `>10s`) | **Strictly Suppressed** (frontend stops timer & server drops email) | 5 minutes (`300,000 ms`) | Amber pending badge $\rightarrow$ Red pulsing card, top warning banner, 2-tone audio chime |
-| **SoC Core Overheat (Critical)** | Broadcom CPU Core Temp ($T_\text{CPU}$) | $T_\text{CPU} > \text{temperature\_threshold}$ | $> \text{temperature\_persistence\_seconds}$ (default: `>10s`) | **Never Suppressed** (runs continuously for hardware safety) | 5 minutes (`300,000 ms`) | Amber pending badge $\rightarrow$ Red pulsing card, top warning banner, 2-tone audio chime |
-| **SoC Core Temp (Pending Warning)** | Broadcom CPU Core Temp ($T_\text{CPU}$) | $\max(45^\circ\text{C}, T_\text{threshold} - 10^\circ\text{C}) \le T_\text{CPU} \le T_\text{threshold}$ | Immediate state change | **Never Suppressed** (runs continuously for hardware safety) | No email dispatched (pre-alert advisory) | Amber card glow, amber meter, `⚠️ PENDING WARNING` pill |
-| **SoC Core Temp (Optimal)** | Broadcom CPU Core Temp ($T_\text{CPU}$) | $T_\text{CPU} < \max(45^\circ\text{C}, T_\text{threshold} - 10^\circ\text{C})$ | Immediate state change | **Never Suppressed** | N/A | Emerald green status, normal meter |
+| **Differential Illuminance** | `ΔLux = abs(Lux1 - Lux2)` | `ΔLux > illuminance_threshold` | `> illuminance_persistence_seconds` (default: `>10s`) | **Strictly Suppressed** (frontend stops timer & server drops email) | 5 minutes (`300,000 ms`) | Amber pending badge ➔ Red pulsing card, top warning banner, 2-tone audio chime |
+| **SoC Core Overheat (Critical)** | Broadcom CPU Core Temp (`T_CPU`) | `T_CPU > temperature_threshold` | `> temperature_persistence_seconds` (default: `>10s`) | **Never Suppressed** (runs continuously for hardware safety) | 5 minutes (`300,000 ms`) | Amber pending badge ➔ Red pulsing card, top warning banner, 2-tone audio chime |
+| **SoC Core Temp (Pending Warning)** | Broadcom CPU Core Temp (`T_CPU`) | `max(45°C, T_threshold - 10°C) <= T_CPU <= T_threshold` | Immediate state change | **Never Suppressed** (runs continuously for hardware safety) | No email dispatched (pre-alert advisory) | Amber card glow, amber meter, `⚠️ PENDING WARNING` pill |
+| **SoC Core Temp (Optimal)** | Broadcom CPU Core Temp (`T_CPU`) | `T_CPU < max(45°C, T_threshold - 10°C)` | Immediate state change | **Never Suppressed** | N/A | Emerald green status, normal meter |
 
 ---
 
-### Condition 1: Differential Illuminance Alert ($\Delta\text{Lux}$)
+### Condition 1: Differential Illuminance Alert (`ΔLux`)
 
 Dual Rohm BH1750 / GY-302 light sensors placed at different vantage points or orientations are compared in real time.
 
-#### 1. Mathematical Formulation
-$$\Delta\text{Lux} = |\text{Sensor}_1 - \text{Sensor}_2|$$
+#### 1. Evaluation Formula
+```
+ΔLux = |Sensor 1 - Sensor 2|
+```
 
 #### 2. Configuration Parameters (`thresholds.yaml`)
 - `illuminance_threshold`: Float value in Lux (e.g. `5000.0`).
@@ -114,18 +116,18 @@ $$\Delta\text{Lux} = |\text{Sensor}_1 - \text{Sensor}_2|$$
                                      (Stream Paused by user: reset & suppress)
 ```
 
-1. **Normal State ($\Delta\text{Lux} \le \text{Threshold}$)**:
+1. **Normal State (`ΔLux <= Threshold`)**:
    - Status pill is hidden.
    - Sensor card displays standard theme borders.
    - Persistence timer is inactive (`luxOverThresholdStart = null`).
 
-2. **Pending Verification State ($\Delta\text{Lux} > \text{Threshold}$ for $t \le \text{Persistence}$)**:
-   - When $\Delta\text{Lux}$ first crosses the threshold, a microsecond timestamp is recorded.
+2. **Pending Verification State (`ΔLux > Threshold` for `elapsed <= Persistence`)**:
+   - When `ΔLux` first crosses the threshold, a timestamp is recorded.
    - While elapsed duration is less than or equal to `illuminance_persistence_seconds`, the UI enters verification mode:
      - An amber status pill appears: `⏳ LUX PENDING (Xs / 10s)`.
      - Acoustic chimes and email dispatches are **held back** to filter out temporary shadows or brief light flicker.
 
-3. **Active Alert Trigger ($\Delta\text{Lux} > \text{Threshold}$ sustained for $t > \text{Persistence}$)**:
+3. **Active Alert Trigger (`ΔLux > Threshold` sustained for `elapsed > Persistence`)**:
    - If the anomaly persists longer than `illuminance_persistence_seconds` without interruption:
      - **Card Styling**: Illuminance card flashes in high-visibility red (`.is-abnormal`).
      - **Status Badge**: Shifts to red error badge: `🚨 ABNORMAL (Δ XXX.X Lux)`.
@@ -141,11 +143,11 @@ $$\Delta\text{Lux} = |\text{Sensor}_1 - \text{Sensor}_2|$$
    - **Backend Guard**: If a delayed frontend request reaches `/api/send_email_alert` while `_stream_state["paused"]` is true, the backend suppresses the dispatch, logs `Status: SUPPRESSED (Stream is globally paused by user)` in `alert_emails.log`, and returns `email_sent: false`.
 
 5. **Recovery & Reset**:
-   - As soon as $\Delta\text{Lux}$ drops back below the threshold, the persistence timer resets to zero, all warning banners and pills dismiss, and the card returns to normal styling.
+   - As soon as `ΔLux` drops back below the threshold, the persistence timer resets to zero, all warning banners and pills dismiss, and the card returns to normal styling.
 
 ---
 
-### Condition 2: Raspberry Pi SoC Core Temperature Overheat Alert ($T_\text{CPU}$)
+### Condition 2: Raspberry Pi SoC Core Temperature Overheat Alert (`CPU Overheat`)
 
 Monitors the Broadcom BCM2835/BCM2711 SoC temperature via `vcgencmd measure_temp` to protect against thermal throttling and hardware damage.
 
@@ -155,12 +157,12 @@ Monitors the Broadcom BCM2835/BCM2711 SoC temperature via `vcgencmd measure_temp
 
 #### 2. Multi-Tier Thermal States
 
-1. **Optimal State ($T_\text{CPU} < \max(45.0^\circ\text{C}, T_\text{threshold} - 10.0^\circ\text{C})$)**:
+1. **Optimal State (`T_CPU < max(45.0°C, Threshold - 10.0°C)`)**:
    - Status text: `Optimal` (emerald green).
    - Meter: Cyan-to-blue gradient.
    - Overheat timers and alert flags are completely cleared.
 
-2. **Approaching Threshold / Pending Warning State ($\max(45.0^\circ\text{C}, T_\text{threshold} - 10.0^\circ\text{C}) \le T_\text{CPU} \le T_\text{threshold}$)**:
+2. **Approaching Threshold / Pending Warning State (`max(45.0°C, Threshold - 10.0°C) <= T_CPU <= Threshold`)**:
    - Pre-warning tier indicating elevated thermal load.
    - Card glow: Amber border glow (`.is-pending`).
    - Status badge: Amber pill `⚠️ PENDING WARNING`.
@@ -168,7 +170,7 @@ Monitors the Broadcom BCM2835/BCM2711 SoC temperature via `vcgencmd measure_temp
    - Meter: Amber.
    - Overheat escalation timer is kept reset.
 
-3. **Overheat Verification State ($T_\text{CPU} > T_\text{threshold}$ for $t \le \text{Persistence}$)**:
+3. **Overheat Verification State (`T_CPU > Threshold` for `elapsed <= Persistence`)**:
    - Temperature exceeds critical threshold.
    - Card glow: Amber border glow (`.is-pending`).
    - Status badge: Amber pill displaying real-time countdown `⏳ OVERHEAT PENDING (Xs / 10s)`.
@@ -176,7 +178,7 @@ Monitors the Broadcom BCM2835/BCM2711 SoC temperature via `vcgencmd measure_temp
    - Meter: Amber.
    - No audio or email alerts trigger yet, protecting against momentary CPU bursts.
 
-4. **Critical Overheat Escalation ($T_\text{CPU} > T_\text{threshold}$ sustained for $t > \text{Persistence}$)**:
+4. **Critical Overheat Escalation (`T_CPU > Threshold` sustained for `elapsed > Persistence`)**:
    - Condition has persisted continuously beyond `temperature_persistence_seconds`.
    - **Card Styling**: Card pulses in warning rose/red (`.is-overheating`).
    - **Status Badge**: Red error badge: `🚨 OVERHEAT (XX.X°C)`.
