@@ -1344,17 +1344,17 @@
 
             <div class="metric-secondary" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                 <div>
-                    <span>Differential Delta:</span>
+                    <span>Delta:</span>
                     <span id="light_diff" class="metric-secondary-val">--</span>
                     <span id="light_rate_change" style="font-size: 0.74rem; color: var(--text-muted); margin-left: 6px; font-family: monospace;"></span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Δ Threshold:</span>
-                        <span id="lux_threshold_val" class="metric-secondary-val" style="color: var(--accent-amber); font-family: monospace;">{{ thresholds.illuminance_threshold if thresholds else 5000.0 }} Lux</span>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
+                    <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+                        <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Alert Delta:</span>
+                        <span id="lux_threshold_val" class="metric-secondary-val" style="color: var(--accent-amber); font-family: monospace;">{{ (thresholds.illuminance_threshold | int) if thresholds else 5000 }} Lux</span>
                     </div>
                     <span style="color: var(--text-secondary); opacity: 0.4; font-size: 0.75rem;">|</span>
-                    <div style="display: flex; align-items: center; gap: 4px;">
+                    <div style="display: flex; align-items: center; gap: 4px; white-space: nowrap;">
                         <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Persist:</span>
                         <span id="lux_persist_val" class="metric-secondary-val" style="color: var(--accent-amber); font-family: monospace;">>{{ thresholds.illuminance_persistence_seconds if (thresholds and thresholds.illuminance_persistence_seconds is defined) else 10 }}s</span>
                     </div>
@@ -1834,7 +1834,7 @@
                     if (data.thresholds.illuminance_threshold !== undefined) {
                         configIlluminanceThreshold = Number(data.thresholds.illuminance_threshold);
                         if (elLuxThresholdVal) {
-                            elLuxThresholdVal.textContent = `${configIlluminanceThreshold.toFixed(1)} Lux`;
+                            elLuxThresholdVal.textContent = `${Math.round(configIlluminanceThreshold)} Lux`;
                         }
                     }
                     if (data.thresholds.illuminance_persistence_seconds !== undefined) {
