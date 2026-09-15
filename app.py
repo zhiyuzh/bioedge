@@ -31,6 +31,13 @@ load_env_file()
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 # -------------------------------------------------
 # I2C
 # -------------------------------------------------
@@ -428,6 +435,77 @@ def send_email_alert():
                 "timestamp": timestamp,
                 "note": delivery_status
             })
+
+        # Server-side guard: validate against thresholds.yaml to reject stale client triggers
+        active_thresholds = load_thresholds()
+        is_test = payload.get("is_test", False) or "Test" in alert_type or "Verification" in alert_type
+
+        if not is_test and "Illuminance" in alert_type:
+            req_thresh = float(active_thresholds.get("illuminance_threshold", 5000.0))
+            lux1 = read_light(0x23)
+            lux2 = read_light(0x5C)
+            if lux1 is not None and lux2 is not None:
+                current_delta = abs(lux1 - lux2)
+                if current_delta < req_thresh:
+                    delivery_status = f"SUPPRESSED (Server check: current delta {current_delta:.1f} Lux < threshold {req_thresh:.1f} Lux from thresholds.yaml)"
+                    log_entry = (
+                        f"[{timestamp}] ALERT EMAIL DISPATCH\n"
+                        f"Status: {delivery_status}\n"
+                        f"Subject: {subject}\n"
+                        f"Send to:\n{send_to_formatted}\n"
+                        f"Body:\n{body}\n"
+                        f"{'='*60}\n"
+                    )
+                    log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_emails.log")
+                    try:
+                        with open(log_file, "a", encoding="utf-8") as f:
+                            f.write(log_entry)
+                    except Exception as log_err:
+                        print(f"[BioEdge Email Log Error]: {log_err}")
+                    return jsonify({
+                        "success": True,
+                        "email_sent": False,
+                        "status": delivery_status,
+                        "subject": subject,
+                        "recipients": recipients,
+                        "timestamp": timestamp,
+                        "note": delivery_status
+                    })
+
+        elif not is_test and ("CPU" in alert_type or "temperature" in alert_type.lower()):
+            req_temp = float(active_thresholds.get("temperature_threshold", 60.0))
+            raw_pi = read_pi_temperature()
+            current_pi_temp = None
+            if raw_pi:
+                try:
+                    current_pi_temp = float(raw_pi.replace("temp=", "").replace("'C", ""))
+                except Exception:
+                    pass
+            if current_pi_temp is not None and current_pi_temp < req_temp:
+                delivery_status = f"SUPPRESSED (Server check: current CPU temp {current_pi_temp:.1f}°C < threshold {req_temp:.1f}°C from thresholds.yaml)"
+                log_entry = (
+                    f"[{timestamp}] ALERT EMAIL DISPATCH\n"
+                    f"Status: {delivery_status}\n"
+                    f"Subject: {subject}\n"
+                    f"Send to:\n{send_to_formatted}\n"
+                    f"Body:\n{body}\n"
+                    f"{'='*60}\n"
+                )
+                log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alert_emails.log")
+                try:
+                    with open(log_file, "a", encoding="utf-8") as f:
+                        f.write(log_entry)
+                except Exception as log_err:
+                    print(f"[BioEdge Email Log Error]: {log_err}")
+                return jsonify({
+                    "success": True,
+                    "email_sent": False,
+                    "status": delivery_status,
+                    "subject": subject,
+                    "recipients": recipients,
+                    "timestamp": timestamp,
+                    "note": delivery_status
+                })
 
         # 1. Reload .env and check environment variables
         load_env_file()
